@@ -14,6 +14,7 @@
     "author": "Miroslav Pejic",
     "license": "AGPLv3",
     "dependencies": {
+        "cloud": "file:",
         "cors": "2.8.5",
         "express": "^4.18.2"
     },

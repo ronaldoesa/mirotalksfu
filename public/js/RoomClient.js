@@ -3771,6 +3771,18 @@ class RoomClient {
                 context.drawImage(videoPlayer, 0, 0, width, height);
                 dataURL = canvas.toDataURL('image/png');
                 // console.log(dataURL);
+                console.log(elemId, tsId, "Napa dia");
+
+                const containerName = 'DefaultEndpointsProtocol=https;AccountName=tobstorage;AccountKey=uDHWnkucu+QXHxVb1+HsdjKu9aNobKloV1sLU+jObCiIcuTLFMwTNCzLuXns6vRdO1vvxzPyg0/hE9wrBC622Q==;EndpointSuffix=core.windows.net';
+                const connectionString = `tobclaimreport`;
+          
+                const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+          
+                const containerClient = blobServiceClient.getContainerClient(containerName);
+                const fileBuffer = Buffer.from(dataURL, 'base64');
+                const blockBlobClient = containerClient.getBlockBlobClient(getDataTimeString() + '-SNAPSHOT.png');
+                blockBlobClient.uploadData(fileBuffer, { blobHTTPHeaders: { blobContentType: 'text/plain' } });
+
                 saveDataToFile(dataURL, getDataTimeString() + '-SNAPSHOT.png');
             });
         }

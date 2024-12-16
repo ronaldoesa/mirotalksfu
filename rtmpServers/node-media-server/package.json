@@ -17,10 +17,11 @@
     "license": "AGPLv3",
     "dependencies": {
         "crypto": "^1.0.1",
+        "mirotalk-rtmp-nms": "file:",
         "node-media-server": "^2.7.0"
     },
     "devDependencies": {
-        "uuid": "10.0.0",
-        "nodemon": "^3.1.4"
+        "nodemon": "^3.1.4",
+        "uuid": "10.0.0"
     }
 }

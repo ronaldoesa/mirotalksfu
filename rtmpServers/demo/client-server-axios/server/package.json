@@ -21,10 +21,11 @@
         "@ffmpeg-installer/ffmpeg": "^1.1.0",
         "body-parser": "1.20.2",
         "cors": "2.8.5",
-        "fluent-ffmpeg": "^2.1.3"
+        "fluent-ffmpeg": "^2.1.3",
+        "mirotalk-rtmp-streamer-server": "file:"
     },
     "devDependencies": {
-        "uuid": "10.0.0",
-        "nodemon": "^3.1.4"
+        "nodemon": "^3.1.4",
+        "uuid": "10.0.0"
     }
 }
