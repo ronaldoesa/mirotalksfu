@@ -1,5 +1,4 @@
 'use strict';
-
 /**
  * MiroTalk SFU - Client component
  *
@@ -182,6 +181,7 @@ const VideoAI = {
 
 // Recording
 let recordedBlobs = [];
+
 
 class RoomClient {
     constructor(
@@ -3769,19 +3769,23 @@ class RoomClient {
                 canvas.height = height;
                 context = canvas.getContext('2d');
                 context.drawImage(videoPlayer, 0, 0, width, height);
+                console.log(context);
+                console.log(canvas);
                 dataURL = canvas.toDataURL('image/png');
-                // console.log(dataURL);
-                console.log(elemId, tsId, "Napa dia");
-
-                const containerName = 'DefaultEndpointsProtocol=https;AccountName=tobstorage;AccountKey=uDHWnkucu+QXHxVb1+HsdjKu9aNobKloV1sLU+jObCiIcuTLFMwTNCzLuXns6vRdO1vvxzPyg0/hE9wrBC622Q==;EndpointSuffix=core.windows.net';
-                const connectionString = `tobclaimreport`;
-          
-                const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-          
-                const containerClient = blobServiceClient.getContainerClient(containerName);
-                const fileBuffer = Buffer.from(dataURL, 'base64');
-                const blockBlobClient = containerClient.getBlockBlobClient(getDataTimeString() + '-SNAPSHOT.png');
-                blockBlobClient.uploadData(fileBuffer, { blobHTTPHeaders: { blobContentType: 'text/plain' } });
+                
+                try {
+                    const response = fetch('/api/v1/uploadToAzure', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ dataURL, fileName: 'SNAPSHOT.png' })
+                    });
+                    const result = response.text();
+                    console.log('Upload result:', result);
+                } catch (error) {
+                    console.error('Error uploading to Azure:', error);
+                }
 
                 saveDataToFile(dataURL, getDataTimeString() + '-SNAPSHOT.png');
             });

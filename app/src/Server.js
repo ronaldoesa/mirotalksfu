@@ -86,10 +86,12 @@ const yaml = require('js-yaml');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = yaml.load(fs.readFileSync(path.join(__dirname, '/../api/swagger.yaml'), 'utf8'));
 const Sentry = require('@sentry/node');
+const { BlobServiceClient } = require("@azure/storage-blob");
 const Discord = require('./Discord.js');
 const Mattermost = require('./Mattermost.js');
 const restrictAccessByIP = require('./middleware/IpWhitelist.js');
 const packageJson = require('../../package.json');
+const { Readable } = require('stream');
 
 // Incoming Stream to RTPM
 const { v4: uuidv4 } = require('uuid');
@@ -110,6 +112,9 @@ const CryptoJS = require('crypto-js');
 const qS = require('qs');
 const slackEnabled = config.slack.enabled;
 const slackSigningSecret = config.slack.signingSecret;
+
+//AzureConn
+const connectionString = "DefaultEndpointsProtocol=https;AccountName=tobstorage;AccountKey=uDHWnkucu+QXHxVb1+HsdjKu9aNobKloV1sLU+jObCiIcuTLFMwTNCzLuXns6vRdO1vvxzPyg0/hE9wrBC622Q==;EndpointSuffix=core.windows.net";
 
 const app = express();
 
@@ -967,6 +972,23 @@ function startServer() {
             body: req.body,
             meeting: meetingURL,
         });
+    });
+
+    app.post([restApi.basePath + '/uploadToAzure'], async (req, res) => {
+        const { dataURL, fileName } = req.body;
+        try {
+            const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+            const containerClient = blobServiceClient.getContainerClient("tobclaimreport");
+            const snapshotBuffer = Buffer.from(dataURL, 'base64');
+            var matches = dataURL.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+            console.log(matches, "matches");
+            //const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+            //await blockBlobClient.uploadData(snapshotBuffer);
+            console.log(`Uploaded: ${fileName}`);
+        } catch (error) {
+            console.error("Azure upload failed:", error);
+            res.status(500).send('Upload failed');
+        }
     });
 
     // request join room endpoint
