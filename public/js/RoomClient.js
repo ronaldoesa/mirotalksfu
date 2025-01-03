@@ -3755,6 +3755,7 @@ class RoomClient {
     handleTS(elemId, tsId) {
         let videoPlayer = this.getId(elemId);
         let btnTs = this.getId(tsId);
+        var roomName = document.getElementById("roomId").innerHTML;
         if (btnTs && videoPlayer) {
             btnTs.addEventListener('click', () => {
                 if (videoPlayer.classList.contains('videoCircle')) {
@@ -3769,25 +3770,21 @@ class RoomClient {
                 canvas.height = height;
                 context = canvas.getContext('2d');
                 context.drawImage(videoPlayer, 0, 0, width, height);
-                console.log(context);
-                console.log(canvas);
                 dataURL = canvas.toDataURL('image/png');
-                
+                var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
                 try {
                     const response = fetch('/api/v1/uploadToAzure', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ dataURL, fileName: 'SNAPSHOT.png' })
+                        body: JSON.stringify({ dataURL, fileName: fileName })
                     });
-                    const result = response.text();
-                    console.log('Upload result:', result);
                 } catch (error) {
                     console.error('Error uploading to Azure:', error);
                 }
-
-                saveDataToFile(dataURL, getDataTimeString() + '-SNAPSHOT.png');
+                
+                saveDataToFile(dataURL, fileName);
             });
         }
     }
