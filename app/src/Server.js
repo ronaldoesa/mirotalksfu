@@ -114,8 +114,10 @@ const slackEnabled = config.slack.enabled;
 const slackSigningSecret = config.slack.signingSecret;
 
 //AzureConn
-const connectionString = "DefaultEndpointsProtocol=https;AccountName=tobstorage;AccountKey=uDHWnkucu+QXHxVb1+HsdjKu9aNobKloV1sLU+jObCiIcuTLFMwTNCzLuXns6vRdO1vvxzPyg0/hE9wrBC622Q==;EndpointSuffix=core.windows.net";
-const containerName = "tobclaimreport";
+const connectionString = config.azure.connectionString;
+const containerName = config.azure.containerName;
+const folderName = config.azure.folderName;
+const env = config.azure.env;
 
 const app = express();
 
@@ -980,11 +982,12 @@ function startServer() {
         try {
             var matches = dataURL.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
             const snapshotBuffer = Buffer.from(matches[2], 'base64');
-            let folderName = fileName.split("-")[0]
+            let match = fileName.match(/^MV-\d+-\d+/);
+            const caseName = match ? match[0] : null;
             const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
             const containerClient = blobServiceClient.getContainerClient(containerName);
             await containerClient.createIfNotExists();
-            const blobPath = `${folderName}/${fileName}`;
+            const blobPath = `${env}/${folderName}/${caseName}/${fileName}`;
             const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
             await blockBlobClient.uploadData(snapshotBuffer);
             console.log(`Uploaded: ${fileName}`);
