@@ -23,9 +23,11 @@ let BUTTONS = {
         swapCameraButton: true,
         chatButton: true,
         pollButton: true,
+        editorButton: true,
         raiseHandButton: true,
         transcriptionButton: true,
         whiteboardButton: true,
+        documentPiPButton: true,
         snapshotRoomButton: true,
         emojiRoomButton: true,
         settingsButton: true,
@@ -45,6 +47,7 @@ let BUTTONS = {
         tabRecording: true,
         host_only_recording: true, // presenter
         pushToTalk: true,
+        keyboardShortcuts: true,
     },
     producerVideo: {
         videoPictureInPicture: true,
@@ -99,7 +102,7 @@ let BUTTONS = {
         saveInfoButton: true, // presenter
         sendFileAllButton: true, // presenter
         ejectAllButton: true, // presenter
-        sendFileButton: false, // presenter & guests
+        sendFileButton: true, // presenter & guests
         geoLocationButton: true, // presenter
         banButton: true, // presenter
         ejectButton: true, // presenter
@@ -150,6 +153,7 @@ function handleRules(isPresenter) {
         BUTTONS.settings.sendEmailInvitation = true;
 
         show(editorUnlockBtn);
+        show(transcriptionAllLi);
         //...
 
         // ##################################
@@ -237,6 +241,7 @@ function handleRulesBroadcasting() {
     BUTTONS.main.swapCameraButton = false;
     //BUTTONS.main.raiseHandButton = false;
     BUTTONS.main.whiteboardButton = false;
+    BUTTONS.main.documentPiPButton = false;
     //BUTTONS.main.snapshotRoomButton = false;
     //BUTTONS.main.emojiRoomButton = false,
     //BUTTONS.main.pollButton = false;
@@ -272,6 +277,7 @@ function handleRulesBroadcasting() {
     elemDisplay('swapCameraButton', false);
     //elemDisplay('raiseHandButton', false);
     elemDisplay('whiteboardButton', false);
+    elemDisplay('documentPiPButton', false);
     //elemDisplay('snapshotRoomButton', false);
     //elemDisplay('emojiRoomButton', false);
     //elemDisplay('pollButton', false);

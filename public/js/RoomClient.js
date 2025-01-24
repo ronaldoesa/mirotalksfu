@@ -8,7 +8,7 @@
  * @license For commercial or closed source, contact us at license.mirotalk@gmail.com or purchase directly via CodeCanyon
  * @license CodeCanyon: https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970
  * @author  Miroslav Pejic - miroslav.pejic.85@gmail.com
- * @version 1.6.45
+ * @version 1.7.10
  *
  */
 
@@ -25,7 +25,7 @@ const html = {
     videoOn: 'fas fa-video',
     videoOff: 'fas fa-video-slash',
     userName: 'username',
-    userHand: 'fas fa-hand-paper pulsate',
+    userHand: 'fas fa-hand-paper user-hand pulsate',
     pip: 'fas fa-images',
     fullScreen: 'fas fa-expand',
     fullScreenOn: 'fas fa-compress-alt',
@@ -110,6 +110,7 @@ const image = {
     network: '../images/network.gif',
     rtmp: '../images/rtmp.png',
     save: '../images/save.png',
+    transcription: '../images/transcription.png',
 };
 
 const mediaType = {
@@ -195,7 +196,6 @@ class RoomClient {
         peer_name,
         peer_uuid,
         peer_info,
-        isDesktopDevice,
         isAudioAllowed,
         isVideoAllowed,
         isScreenAllowed,
@@ -210,7 +210,13 @@ class RoomClient {
         this.videoPinMediaContainer = videoPinMediaContainer;
         this.mediasoupClient = mediasoupClient;
 
+        // Handle Socket
         this.socket = socket;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectInterval = 3000;
+        this.maxReconnectInterval = 15000;
+
         this.room_id = room_id;
         this.peer_id = socket.id;
         this.peer_name = peer_name;
@@ -218,9 +224,9 @@ class RoomClient {
         this.peer_info = peer_info;
 
         // Device type
-        this.isDesktopDevice = isDesktopDevice;
-        this.isMobileDevice = DetectRTC.isMobileDevice;
-        this.isMobileSafari = this.isMobileDevice && DetectRTC.browser.name === 'Safari';
+        this.isDesktopDevice = peer_info.is_desktop_device;
+        this.isMobileDevice = peer_info.is_mobile_device;
+        this.isMobileSafari = this.isMobileDevice && peer_info.browser_name.toLowerCase().includes('safari');
 
         // RTMP selected file name
         this.selectedRtmpFilename = '';
@@ -693,6 +699,7 @@ class RoomClient {
                 });
                 callback();
             } catch (err) {
+                console.error('Producer Transport connection error', err);
                 errback(err);
             }
         });
@@ -724,18 +731,6 @@ class RoomClient {
                     break;
                 case 'disconnected':
                     console.log('Producer Transport disconnected', { id: this.producerTransport.id });
-
-                    this.restartIce();
-
-                    this.toast(
-                        'warning',
-                        'Producer Transport lost',
-                        'Network connection may have dropped or changed (Restarted ICE)',
-                        'top-end',
-                        6000,
-                        true,
-                    );
-
                     break;
                 case 'failed':
                     console.warn('Producer Transport failed', { id: this.producerTransport.id });
@@ -797,6 +792,7 @@ class RoomClient {
                 });
                 callback();
             } catch (err) {
+                console.error('Consumer Transport connection error', err);
                 errback(err);
             }
         });
@@ -811,18 +807,6 @@ class RoomClient {
                     break;
                 case 'disconnected':
                     console.log('Consumer Transport disconnected', { id: this.consumerTransport.id });
-
-                    this.restartIce();
-
-                    this.toast(
-                        'warning',
-                        'Consumer Transport lost',
-                        'Network connection may have dropped or changed (Restarted ICE)',
-                        'top-end',
-                        6000,
-                        true,
-                    );
-
                     break;
                 case 'failed':
                     console.warn('Consumer Transport failed', { id: this.consumerTransport.id });
@@ -900,6 +884,8 @@ class RoomClient {
     // ####################################################
 
     initSockets() {
+        this.socket.on('connect', this.handleSocketConnect);
+        this.socket.on('disconnect', this.handleSocketDisconnect);
         this.socket.on('consumerClosed', this.handleConsumerClosed);
         this.socket.on('setVideoOff', this.handleSetVideoOff);
         this.socket.on('removeMe', this.handleRemoveMe);
@@ -924,8 +910,6 @@ class RoomClient {
         this.socket.on('updateRoomModerator', this.handleUpdateRoomModeratorData);
         this.socket.on('updateRoomModeratorALL', this.handleUpdateRoomModeratorALLData);
         this.socket.on('recordingAction', this.handleRecordingActionData);
-        this.socket.on('connect', this.handleSocketConnect);
-        this.socket.on('disconnect', this.handleSocketDisconnect);
         this.socket.on('endRTMP', this.handleEndRTMP);
         this.socket.on('errorRTMP', this.handleErrorRTMP);
         this.socket.on('endRTMPfromURL', this.handleEndRTMPfromURL);
@@ -939,6 +923,16 @@ class RoomClient {
     // ####################################################
     // HANDLE SOCKET DATA
     // ####################################################
+
+    handleSocketConnect = () => {
+        console.log('SocketOn Connected to signaling server!');
+        this.handleConnect();
+    };
+
+    handleSocketDisconnect = (reason) => {
+        console.log(`SocketOn Disconnect Reason: ${reason}`);
+        this.handleDisconnect(reason);
+    };
 
     handleConsumerClosed = ({ consumer_id, consumer_kind }) => {
         console.log('SocketOn Closing consumer', { consumer_id, consumer_kind });
@@ -1077,18 +1071,6 @@ class RoomClient {
         this.handleRecordingAction(data);
     };
 
-    handleSocketConnect = () => {
-        console.log('SocketOn Connected to signaling server!');
-        this._isConnected = true;
-        this.refreshBrowser();
-    };
-
-    handleSocketDisconnect = () => {
-        this.exit(true);
-        this.ServerAway();
-        this.saveRecording('Socket disconnected');
-    };
-
     handleEndRTMP = (data) => {
         this.endRTMP(data);
     };
@@ -1122,16 +1104,147 @@ class RoomClient {
     };
 
     // ####################################################
+    // SOCKET CONNECT/DISCONNECT
+    // ####################################################
+
+    handleConnect() {
+        this._isConnected = true;
+        this.refreshBrowser();
+    }
+
+    handleDisconnect(reason) {
+        window.localStorage.isReconnected = true;
+
+        console.log('Disconnected. Attempting to reconnect...');
+        this.exit(true);
+
+        let reconnectAlert;
+
+        // Helper functions
+        const showReconnectAlert = () => {
+            this.sound('reconnect');
+            reconnectAlert = Swal.fire({
+                background: swalBackground,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showDenyButton: false,
+                showConfirmButton: false,
+                icon: 'warning',
+                title: `Lost connection\n(${reason})`,
+                text: `The server may be under maintenance or your connection may have changed. Please ${this.isMobileDevice ? 'wait...' : 'check your connection.'}`,
+                showClass: { popup: 'animate__animated animate__fadeInDown' },
+                hideClass: { popup: 'animate__animated animate__fadeOutUp' },
+            });
+        };
+
+        const showMaxAttemptsAlert = () => {
+            this.sound('alert');
+            Swal.fire({
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showDenyButton: false,
+                showConfirmButton: true,
+                background: swalBackground,
+                title: 'Unable to reconnect',
+                text: 'Please check your internet connection!',
+                icon: 'error',
+                confirmButtonText: 'Join Room',
+                confirmButtonColor: '#18392B',
+                showClass: { popup: 'animate__animated animate__fadeInDown' },
+                hideClass: { popup: 'animate__animated animate__fadeOutUp' },
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    this.refreshBrowser();
+                }
+            });
+        };
+
+        const showServerAwayMessage = () => {
+            console.warn('Server away or in maintenance, please wait...');
+            this.ServerAway();
+        };
+
+        // Show reconnect alert or save recording if necessary
+        this.isRecording() ? this.saveRecording('Socket disconnected') : showReconnectAlert();
+
+        let serverAwayShown = false;
+        let reconnect;
+        let reconnectTimer;
+        let waitingTime = this.isMobileDevice ? 30000 : 6000;
+
+        // Clear existing timers if any
+        const clearTimers = () => {
+            clearTimeout(reconnect);
+            clearTimeout(reconnectTimer);
+        };
+
+        // Handle connect_error events
+        this.socket.once('connect_error', () => {
+            clearTimers();
+        });
+        this.socket.on('connect_error', () => {
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                reconnectAlert.update({
+                    title: 'Reconnect',
+                    text: `Attempting to reconnect ${this.reconnectAttempts}...`,
+                });
+            } else {
+                if (!serverAwayShown) {
+                    showServerAwayMessage();
+                    serverAwayShown = true;
+                }
+            }
+        });
+
+        // Attempt reconnect after delay
+        const attemptReconnect = async () => {
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                console.log(`Reconnection attempt ${this.reconnectAttempts}...`);
+
+                const delay = Math.min(this.reconnectInterval * this.reconnectAttempts, this.maxReconnectInterval);
+
+                reconnectAlert.update({
+                    title: 'Reconnect',
+                    text: `Attempting to reconnect in ${delay / 1000}s...`,
+                });
+
+                reconnectTimer = setTimeout(() => {
+                    this.socket.connect();
+                    attemptReconnect();
+                }, delay);
+            } else {
+                console.log('Reconnection limit reached!');
+                reconnectAlert.close();
+                showMaxAttemptsAlert();
+            }
+        };
+
+        // Handle successful reconnection
+        this.socket.once('connect', () => {
+            console.log('Reconnected!');
+            this.reconnectAttempts = 0;
+            clearTimers();
+        });
+
+        //Start reconnect logic after a brief delay
+        reconnect = setTimeout(() => {
+            showReconnectAlert();
+            attemptReconnect();
+        }, waitingTime);
+    }
+
+    // ####################################################
     // SERVER AWAY/MAINTENANCE
     // ####################################################
 
     ServerAway() {
         this.sound('alert');
-        window.localStorage.isReconnected = true;
         Swal.fire({
             allowOutsideClick: false,
             allowEscapeKey: false,
-            showDenyButton: true,
+            showDenyButton: false,
             showConfirmButton: false,
             background: swalBackground,
             imageUrl: image.poster,
@@ -1306,8 +1419,12 @@ class RoomClient {
 
     async produce(type, deviceId = null, swapCamera = false, init = false) {
         let mediaConstraints = {};
+        let elem;
+        let stream;
         let audio = false;
+        let video = false;
         let screen = false;
+
         switch (type) {
             case mediaType.audio:
                 this.isAudioAllowed = true;
@@ -1319,6 +1436,7 @@ class RoomClient {
                 swapCamera
                     ? (mediaConstraints = this.getCameraConstraints())
                     : (mediaConstraints = this.getVideoConstraints(deviceId));
+                video = true;
                 break;
             case mediaType.screen:
                 mediaConstraints = this.getScreenConstraints();
@@ -1327,9 +1445,11 @@ class RoomClient {
             default:
                 return;
         }
+
         if (!this.device.canProduce('video') && !audio) {
             return console.error('Cannot produce video');
         }
+
         if (this.producerLabel.has(type)) {
             return console.warn('Producer already exists for this type ' + type);
         }
@@ -1339,7 +1459,6 @@ class RoomClient {
 
         console.log(`Media constraints ${type}:`, mediaConstraints);
 
-        let stream;
         try {
             if (init) {
                 stream = initStream;
@@ -1352,6 +1471,20 @@ class RoomClient {
             console.log('Supported Constraints', navigator.mediaDevices.getSupportedConstraints());
 
             const track = audio ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+
+            if (screen) {
+                /*
+                    track.contentHint helps optimize media tracks for specific use cases like `motion` or `detail`.
+                        - `motion`: For high frame rate, suitable for dynamic content like video playback or game streaming.
+                        - `detail`: For content requiring high fidelity, such as screen sharing with text, graphics, or fine details, prioritizing resolution over frame rate.
+                */
+                if ('contentHint' in track) {
+                    track.contentHint = 'detail';
+                    console.info('Optimized video Track for screen sharing!');
+                } else {
+                    console.warn('contentHint is not supported in this browser');
+                }
+            }
 
             console.log(`${type} settings ->`, track.getSettings());
 
@@ -1372,7 +1505,7 @@ class RoomClient {
                 };
             }
 
-            if (!audio && !screen) {
+            if (video) {
                 const { encodings, codec } = this.getWebCamEncoding();
                 console.log('GET WEBCAM ENCODING', {
                     encodings: encodings,
@@ -1385,7 +1518,7 @@ class RoomClient {
                 };
             }
 
-            if (!audio && screen) {
+            if (screen) {
                 const { encodings, codec } = this.getScreenEncoding();
                 console.log('GET SCREEN ENCODING', {
                     encodings: encodings,
@@ -1417,87 +1550,45 @@ class RoomClient {
 
             // if screen sharing produce the tab audio + microphone
             if (screen && stream.getAudioTracks()[0]) {
-                this.produceScreenAudio(stream);
+                await this.produceScreenAudio(stream);
             }
 
-            let elem, au;
             if (!audio) {
                 this.localVideoStream = stream;
-                if (type == mediaType.video) this.videoProducerId = producer.id;
-                if (type == mediaType.screen) this.screenProducerId = producer.id;
+
                 elem = await this.handleProducer(producer.id, type, stream);
+
+                if (video) this.videoProducerId = producer.id;
+                if (screen) this.screenProducerId = producer.id;
+
                 // No mirror effect for producer
                 if (!isInitVideoMirror && elem.classList.contains('mirror')) {
                     elem.classList.remove('mirror');
                 }
-                //if (!screen && !isEnumerateDevices) enumerateVideoDevices(stream);
             } else {
                 this.localAudioStream = stream;
+
+                elem = await this.handleProducer(producer.id, type, stream);
+
                 this.audioProducerId = producer.id;
-                au = await this.handleProducer(producer.id, type, stream);
-                //if (!isEnumerateDevices) enumerateAudioDevices(stream);
+
                 getMicrophoneVolumeIndicator(stream);
             }
 
-            if (type == mediaType.video) {
+            if (video) {
                 this.handleHideMe();
             }
 
             producer.on('trackended', () => {
-                console.log('Producer track ended', { id: producer.id, type });
-                this.closeProducer(type);
+                this.closeProducer(type, 'trackended');
             });
 
             producer.on('transportclose', () => {
-                console.log('Producer transport close', { id: producer.id, type });
-                if (!audio) {
-                    const d = this.getId(producer.id + '__video');
-                    const vb = this.getId(producer.id + '__vb');
-
-                    elem.srcObject.getTracks().forEach(function (track) {
-                        track.stop();
-                    });
-                    elem.parentNode.removeChild(elem);
-
-                    d.parentNode.removeChild(d);
-                    vb.parentNode.removeChild(vb);
-
-                    handleAspectRatio();
-                    console.log('[transportClose] Video-element-count', this.videoMediaContainer.childElementCount);
-                } else {
-                    au.srcObject.getTracks().forEach(function (track) {
-                        track.stop();
-                    });
-                    au.parentNode.removeChild(au);
-                    console.log('[transportClose] audio-element-count', this.localAudioEl.childElementCount);
-                }
-                this.closeProducer(type);
+                this.closeProducer(type, 'transportclose');
             });
 
             producer.on('close', () => {
-                console.log('Closing producer', { id: producer.id, type });
-                if (!audio) {
-                    const d = this.getId(producer.id + '__video');
-                    const vb = this.getId(producer.id + '__vb');
-
-                    elem.srcObject.getTracks().forEach(function (track) {
-                        track.stop();
-                    });
-                    elem.parentNode.removeChild(elem);
-
-                    d.parentNode.removeChild(d);
-                    vb.parentNode.removeChild(vb);
-
-                    handleAspectRatio();
-                    console.log('[closingProducer] Video-element-count', this.videoMediaContainer.childElementCount);
-                } else {
-                    au.srcObject.getTracks().forEach(function (track) {
-                        track.stop();
-                    });
-                    au.parentNode.removeChild(au);
-                    console.log('[closingProducer] audio-element-count', this.localAudioEl.childElementCount);
-                }
-                this.closeProducer(type);
+                this.closeProducer(type, 'close');
             });
 
             switch (type) {
@@ -1543,6 +1634,7 @@ class RoomClient {
     getAudioConstraints(deviceId) {
         let constraints = {
             audio: {
+                autoGainControl: true,
                 echoCancellation: true,
                 noiseSuppression: true,
                 deviceId: deviceId,
@@ -1871,7 +1963,7 @@ class RoomClient {
     }
 
     closeThenProduce(type, deviceId = null, swapCamera = false) {
-        this.closeProducer(type);
+        this.closeProducer(type, 'closeThenProduce');
         setTimeout(async function () {
             await rc.produce(type, deviceId, swapCamera);
         }, 1000);
@@ -2006,7 +2098,7 @@ class RoomClient {
             case mediaType.audio:
                 elem = document.createElement('audio');
                 elem.setAttribute('id', id);
-                elem.setAttribute('name', id + '__localAudio');
+                elem.setAttribute('name', 'LOCAL-AUDIO');
                 elem.setAttribute('volume', this.peer_id + '___pVolume');
                 elem.controls = false;
                 elem.autoplay = true;
@@ -2040,7 +2132,7 @@ class RoomClient {
         this.producers.get(producer_id).pause();
 
         try {
-            const response = await this.socket.request('pauseProducer', { producer_id: producer_id });
+            const response = await this.socket.request('pauseProducer', { producer_id, type });
             console.log('Producer paused', response);
         } catch (error) {
             console.error('Error pausing producer', error);
@@ -2071,7 +2163,7 @@ class RoomClient {
         this.producers.get(producer_id).resume();
 
         try {
-            const response = await this.socket.request('resumeProducer', { producer_id: producer_id });
+            const response = await this.socket.request('resumeProducer', { producer_id, type });
             console.log('Producer resumed', response);
         } catch (error) {
             console.error('Error resuming producer', error);
@@ -2093,7 +2185,7 @@ class RoomClient {
         }
     }
 
-    closeProducer(type) {
+    closeProducer(type, event = 'Close Producer') {
         if (!this.producerLabel.has(type)) {
             return console.warn('There is no producer for this type ' + type);
         }
@@ -2106,7 +2198,7 @@ class RoomClient {
             type: type,
             status: false,
         };
-        console.log(`Close producer ${type}`, data);
+        console.log(`${event} ${type}`, data);
 
         this.socket.emit('producerClosed', data);
 
@@ -2114,19 +2206,9 @@ class RoomClient {
         this.producers.delete(producer_id);
         this.producerLabel.delete(type);
 
-        console.log('[closeProducer] - PRODUCER LABEL', this.producerLabel);
+        console.log(`[${event}] - PRODUCER LABEL`, this.producerLabel);
 
-        if (type !== mediaType.audio) {
-            const elem = this.getId(producer_id);
-            const d = this.getId(producer_id + '__video');
-            const vb = this.getId(producer_id + '__vb');
-            elem.srcObject.getTracks().forEach(function (track) {
-                track.stop();
-            });
-            d.parentNode.removeChild(d);
-            vb.parentNode.removeChild(vb);
-
-            //alert(this.pinnedVideoPlayerId + '==' + producer_id);
+        if (type === mediaType.video || type === mediaType.screen) {
             if (this.isVideoPinned && this.pinnedVideoPlayerId == producer_id) {
                 this.removeVideoPinMediaContainer();
                 console.log('Remove pin container due the Producer close', {
@@ -2135,21 +2217,24 @@ class RoomClient {
                 });
             }
 
-            handleAspectRatio();
-
-            console.log('[producerClose] Video-element-count', this.videoMediaContainer.childElementCount);
+            const video = this.getId(producer_id);
+            this.removeVideoProducer(video, event);
         }
 
         if (type === mediaType.audio) {
-            const au = this.getName(producer_id + '__localAudio');
-            au.srcObject.getTracks().forEach(function (track) {
-                track.stop();
-            });
-            this.localAudioEl.removeChild(au);
-            console.log('[producerClose] Audio-element-count', this.localAudioEl.childElementCount);
+            const audio = this.getId(producer_id);
+            this.removeAudioProducer(audio, event);
+        }
+
+        if (type === mediaType.audioTab) {
+            const auTab = this.getId(producer_id);
+            this.removeAudioProducer(auTab, event);
         }
 
         switch (type) {
+            case mediaType.audioTab:
+                console.log('Closed audio tab');
+                break;
             case mediaType.audio:
                 this.setIsAudio(this.peer_id, false);
                 this.event(_EVENTS.stopAudio);
@@ -2192,35 +2277,52 @@ class RoomClient {
 
             console.log('[produceScreenAudio] - PRODUCER LABEL', this.producerLabel);
 
-            const sa = await this.handleProducer(producerSa.id, mediaType.audio, stream);
+            await this.handleProducer(producerSa.id, mediaType.audio, stream);
 
             producerSa.on('trackended', () => {
-                console.log('Producer Screen audio track ended', { id: producerSa.id });
-                this.closeProducer(mediaType.audioTab);
+                this.closeProducer(mediaType.audioTab, 'trackended');
             });
 
             producerSa.on('transportclose', () => {
-                console.log('Producer Screen audio transport close', { id: producerSa.id });
-                sa.srcObject.getTracks().forEach(function (track) {
-                    track.stop();
-                });
-                sa.parentNode.removeChild(sa);
-                console.log('[transportClose] audio-element-count', this.localAudioEl.childElementCount);
-                this.closeProducer(mediaType.audioTab);
+                this.closeProducer(mediaType.audioTab, 'transportclose');
             });
 
             producerSa.on('close', () => {
-                console.log('Closing Screen audio producer', { id: producerSa.id });
-                sa.srcObject.getTracks().forEach(function (track) {
-                    track.stop();
-                });
-                sa.parentNode.removeChild(sa);
-                console.log('[closingProducer] audio-element-count', this.localAudioEl.childElementCount);
-                this.closeProducer(mediaType.audioTab);
+                this.closeProducer(mediaType.audioTab, 'close');
             });
         } catch (err) {
-            console.error('Produce error:', err);
+            console.error('Produce Screen Audio error:', err);
         }
+    }
+
+    // ####################################################
+    // REMOVE PRODUCER VIDEO/AUDIO
+    // ####################################################
+
+    removeVideoProducer(video, event) {
+        const d = this.getId(video.id + '__video');
+        const vb = this.getId(video.id + '__vb');
+
+        video.srcObject.getTracks().forEach(function (track) {
+            track.stop();
+        });
+        video.parentNode.removeChild(video);
+
+        d.parentNode.removeChild(d);
+        vb.parentNode.removeChild(vb);
+
+        handleAspectRatio();
+
+        console.log(`[${event}] Video-element-count`, this.videoMediaContainer.childElementCount);
+    }
+
+    removeAudioProducer(audio, event) {
+        audio.srcObject.getTracks().forEach(function (track) {
+            track.stop();
+        });
+        audio.parentNode.removeChild(audio);
+
+        console.log(`[${event}] audio-element-count`, this.localAudioEl.childElementCount);
     }
 
     // ####################################################
@@ -2240,9 +2342,11 @@ class RoomClient {
 
             this.consumers.set(consumer.id, consumer);
 
+            await this.handleConsumer(consumer.id, type, stream, peer_name, peer_info);
+
             // https://mediasoup.discourse.group/t/create-server-side-consumers-with-paused-true/244
             try {
-                const response = await this.socket.request('resumeConsumer', { consumer_id: consumer.id });
+                const response = await this.socket.request('resumeConsumer', { consumer_id: consumer.id, type });
                 console.log('Consumer resumed', response);
             } catch (error) {
                 console.error('Error resuming consumer', error);
@@ -2258,13 +2362,13 @@ class RoomClient {
                 this.removeConsumer(consumer.id, consumer.kind);
             });
 
-            this.handleConsumer(consumer.id, type, stream, peer_name, peer_info);
-
             if (kind === 'video' && isParticipantsListOpen) {
                 await getRoomParticipants();
             }
         } catch (error) {
             console.error('Error in consume', error);
+
+            popupHtmlMessage(null, image.network, 'Consume', error, 'center', '/', true);
         }
     }
 
@@ -2272,12 +2376,11 @@ class RoomClient {
         const { rtpCapabilities } = this.device;
 
         const data = await this.socket.request('consume', {
-            rtpCapabilities,
             consumerTransportId: this.consumerTransport.id,
+            rtpCapabilities,
             producerId,
+            type,
         });
-
-        console.log('DATA', data);
 
         const { id, kind, rtpParameters } = data;
         const codecOptions = {};
@@ -2543,6 +2646,8 @@ class RoomClient {
     }
 
     removeConsumer(consumer_id, consumer_kind) {
+        if (!this.consumers.get(consumer_id)) return;
+
         console.log('Remove consumer', { consumer_id: consumer_id, consumer_kind: consumer_kind });
 
         const elem = this.getId(consumer_id);
@@ -2808,9 +2913,9 @@ class RoomClient {
         }
     }
 
-    exitRoom() {
+    exitRoom(disconnectAll = false) {
         //...
-        if (isPresenter && switchDisconnectAllOnLeave.checked) {
+        if (isPresenter && (disconnectAll || switchDisconnectAllOnLeave.checked)) {
             this.ejectAllOnLeave();
         }
         this.exit();
@@ -2903,7 +3008,7 @@ class RoomClient {
     // ####################################################
 
     setTippy(elem, content, placement, allowHTML = false) {
-        if (DetectRTC.isMobileDevice) return;
+        if (this.isMobileDevice) return;
         const element = this.getId(elem);
         if (element) {
             if (element._tippy) {
@@ -3105,9 +3210,9 @@ class RoomClient {
     // UTILITY
     // ####################################################
 
-    async sound(name, force = false) {
+    async sound(name, force = false, path = '../sounds/', ext = '.wav') {
         if (!isSoundEnabled && !force) return;
-        let sound = '../sounds/' + name + '.wav';
+        let sound = path + name + ext;
         let audio = new Audio(sound);
         try {
             audio.volume = 0.5;
@@ -3286,10 +3391,7 @@ class RoomClient {
 
     thereAreParticipants() {
         // console.log('participantsCount ---->', participantsCount);
-        if (this.consumers.size > 0 || participantsCount > 1) {
-            return true;
-        }
-        return false;
+        return this.consumers.size > 0 || participantsCount > 1;
     }
 
     // ####################################################
@@ -3305,7 +3407,8 @@ class RoomClient {
             mySettings.style.height = '100%';
         }
         mySettings.classList.toggle('show');
-        this.isMySettingsOpen = this.isMySettingsOpen ? false : true;
+        this.isMySettingsOpen = !this.isMySettingsOpen;
+        this.videoMediaContainer.style.opacity = this.isMySettingsOpen ? 0.3 : 1;
     }
 
     openTab(evt, tabName) {
@@ -3380,6 +3483,151 @@ class RoomClient {
                     });
                 }
             });
+        }
+        if (videoPlayer) {
+            videoPlayer.addEventListener('leavepictureinpicture', (event) => {
+                console.log('Exited PiP mode');
+                if (videoPlayer.paused) {
+                    videoPlayer.play().catch((error) => {
+                        console.error('Error playing video after exit PIP mode:', error);
+                    });
+                }
+            });
+        }
+    }
+
+    // ####################################################
+    // HANDLE DOCUMENT PIP
+    // ####################################################
+
+    async toggleDocumentPIP() {
+        if (documentPictureInPicture.window) {
+            documentPictureInPicture.window.close();
+            console.log('DOCUMENT PIP close');
+            return;
+        }
+        await this.documentPictureInPictureOpen();
+    }
+
+    documentPictureInPictureClose() {
+        if (!showDocumentPipBtn) return;
+        if (documentPictureInPicture.window) {
+            documentPictureInPicture.window.close();
+            console.log('DOCUMENT PIP close');
+        }
+    }
+
+    async documentPictureInPictureOpen() {
+        if (!showDocumentPipBtn) return;
+        try {
+            const pipWindow = await documentPictureInPicture.requestWindow({
+                width: 300,
+                height: 720,
+            });
+
+            function updateCustomProperties() {
+                const documentStyle = getComputedStyle(document.documentElement);
+
+                pipWindow.document.documentElement.style = `
+                    --body-bg: ${documentStyle.getPropertyValue('--body-bg')};
+                `;
+            }
+
+            updateCustomProperties();
+
+            const pipStylesheet = document.createElement('link');
+            const pipVideoContainer = document.createElement('div');
+
+            pipStylesheet.type = 'text/css';
+            pipStylesheet.rel = 'stylesheet';
+            pipStylesheet.href = '../css/DocumentPiP.css';
+
+            pipVideoContainer.className = 'pipVideoContainer';
+
+            pipWindow.document.head.append(pipStylesheet);
+            pipWindow.document.body.append(pipVideoContainer);
+
+            function cloneVideoElements() {
+                let foundVideo = false;
+
+                pipVideoContainer.innerHTML = '';
+
+                [...document.querySelectorAll('video')].forEach((video) => {
+                    console.log('DOCUMENT PIP found video id -----> ' + video.id);
+
+                    // No video stream detected or is video share from URL...
+                    if (!video.srcObject || video.id === '__videoShare') return;
+
+                    const videoElement = rc.getId(video.id);
+
+                    const isPIPAllowed = !videoElement.classList.contains('videoCircle'); // Check if not in privacy mode
+
+                    const logMessage = [rc.videoProducerId, rc.screenProducerId].includes(video.id)
+                        ? `DOCUMENT PIP PRODUCER: PiP allowed? -----> ${isPIPAllowed}`
+                        : `DOCUMENT PIP CONSUMER: PiP allowed? -----> ${isPIPAllowed}`;
+
+                    console.log(logMessage);
+
+                    if (!isPIPAllowed) return;
+
+                    // Video is ON and not in privacy mode continue....
+
+                    foundVideo = true;
+
+                    const pipVideo = document.createElement('video');
+
+                    pipVideo.classList.add('pipVideo');
+                    pipVideo.classList.toggle('mirror', video.classList.contains('mirror'));
+                    pipVideo.srcObject = video.srcObject;
+                    pipVideo.autoplay = true;
+                    pipVideo.muted = true;
+
+                    pipVideoContainer.append(pipVideo);
+
+                    const videoElementObserver = new MutationObserver((mutations) => {
+                        mutations.forEach((mutation) => {
+                            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                                // Handle class changes in video elements
+                                console.log(`Video ${mutation.target.id} class changed:`, mutation.target.className);
+                                cloneVideoElements();
+                            }
+                        });
+                    });
+
+                    // Start observing for new videos and class changes
+                    videoElementObserver.observe(video, { attributes: true, attributeFilter: ['class'] });
+                });
+
+                return foundVideo;
+            }
+
+            if (!cloneVideoElements()) {
+                rc.documentPictureInPictureClose();
+                return userLog('warning', 'No video allowed for Document PIP', 'top-end', 6000);
+            }
+
+            const videoObserver = new MutationObserver(() => {
+                cloneVideoElements();
+            });
+
+            videoObserver.observe(rc.videoMediaContainer, {
+                childList: true,
+            });
+
+            const documentObserver = new MutationObserver(() => {
+                updateCustomProperties();
+            });
+
+            documentObserver.observe(document.documentElement, {
+                attributeFilter: ['style'],
+            });
+
+            pipWindow.addEventListener('unload', () => {
+                videoObserver.disconnect();
+                documentObserver.disconnect();
+            });
+        } catch (err) {
+            userLog('warning', err.message, 'top-end', 6000);
         }
     }
 
@@ -4304,7 +4552,6 @@ class RoomClient {
     }
 
     appendMessage(side, img, fromName, fromId, msg, toId, toName) {
-        //
         const getSide = filterXSS(side);
         const getImg = filterXSS(img);
         const getFromName = filterXSS(fromName);
@@ -4322,12 +4569,11 @@ class RoomClient {
             : `<span class="message-data-time">${time}, ${getFromName} </span>`;
 
         const formatMessage = this.formatMsg(getMsg);
-        console.log('FormatMessage', formatMessage);
         const speechButton = this.isSpeechSynthesisSupported
             ? `<button 
                     id="msg-speech-${chatMessagesId}" 
                     class="mr5" 
-                    onclick="rc.speechText('${formatMessage}')">
+                    onclick="rc.speechElementText('message-${chatMessagesId}')">
                     <i class="fas fa-volume-high"></i>
                 </button>`
             : '';
@@ -4335,8 +4581,6 @@ class RoomClient {
         const positionFirst = myMessage
             ? `<img src="${getImg}" alt="avatar" />${timeAndName}`
             : `${timeAndName}<img src="${getImg}" alt="avatar" />`;
-
-        const message = getFromName === 'ChatGPT' ? `<pre>${getMsg}</pre>` : getMsg;
 
         const newMessageHTML = `
             <li id="msg-${chatMessagesId}"  
@@ -4350,13 +4594,13 @@ class RoomClient {
                     ${positionFirst}
                 </div>
                 <div class="message ${messageClass}">
-                    <span class="text-start " id="${chatMessagesId}">${message}</span>
+                    <span class="text-start" id="message-${chatMessagesId}"></span>
                     <hr/>
                     <div class="about-buttons mt5">
                         <button 
                             id="msg-copy-${chatMessagesId}" 
                             class="mr5" 
-                            onclick="rc.copyToClipboard('${chatMessagesId}')">
+                            onclick="rc.copyToClipboard('message-${chatMessagesId}')">
                             <i class="fas fa-paste"></i>
                         </button>
                         ${speechButton}
@@ -4387,6 +4631,18 @@ class RoomClient {
                 break;
         }
 
+        const message = getId(`message-${chatMessagesId}`);
+        if (message) {
+            if (getFromName === 'ChatGPT') {
+                // Stream the message for ChatGPT
+                this.streamMessage(message, getMsg, 100);
+            } else {
+                // Process the message for other senders
+                message.innerHTML = this.processMessage(getMsg);
+                hljs.highlightAll();
+            }
+        }
+
         chatHistory.scrollTop += 500;
 
         if (!this.isMobileDevice) {
@@ -4396,6 +4652,60 @@ class RoomClient {
         }
 
         chatMessagesId++;
+    }
+
+    streamMessage(element, message, speed = 100) {
+        const parts = this.processMessage(message);
+        const words = parts.split(' ');
+
+        let textBuffer = '';
+        let wordIndex = 0;
+
+        const interval = setInterval(() => {
+            if (wordIndex < words.length) {
+                textBuffer += words[wordIndex] + ' ';
+                element.innerHTML = textBuffer;
+                wordIndex++;
+            } else {
+                clearInterval(interval);
+                highlightCodeBlocks(element);
+            }
+        }, speed);
+
+        function highlightCodeBlocks(element) {
+            const codeBlocks = element.querySelectorAll('pre code');
+            codeBlocks.forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
+    }
+
+    processMessage(message) {
+        const codeBlockRegex = /```([a-zA-Z0-9]+)?\n([\s\S]*?)```/g;
+        let parts = [];
+        let lastIndex = 0;
+
+        message.replace(codeBlockRegex, (match, lang, code, offset) => {
+            if (offset > lastIndex) {
+                parts.push({ type: 'text', value: message.slice(lastIndex, offset) });
+            }
+            parts.push({ type: 'code', lang, value: code });
+            lastIndex = offset + match.length;
+        });
+
+        if (lastIndex < message.length) {
+            parts.push({ type: 'text', value: message.slice(lastIndex) });
+        }
+
+        return parts
+            .map((part) => {
+                if (part.type === 'text') {
+                    return part.value;
+                } else if (part.type === 'code') {
+                    return `<pre><code class="language-${part.lang || ''}">${part.value}</code></pre>`;
+                }
+            })
+            .join('');
     }
 
     deleteMessage(id) {
@@ -4566,6 +4876,11 @@ class RoomClient {
         speech.text = (newMsg ? 'New' : '') + ' message from:' + from + '. The message is:' + msg;
         speech.rate = 0.9;
         window.speechSynthesis.speak(speech);
+    }
+
+    speechElementText(elemId) {
+        const element = this.getId(elemId);
+        this.speechText(element.innerText);
     }
 
     speechText(msg) {
@@ -5527,7 +5842,7 @@ class RoomClient {
         const type = recordedBlobs[0].type.includes('mp4') ? 'mp4' : 'webm';
         const blob = new Blob(recordedBlobs, { type: 'video/' + type });
         const recFileName = `Rec_${dateTime}.${type}`;
-        const currentDevice = DetectRTC.isMobileDevice ? 'MOBILE' : 'PC';
+        const currentDevice = this.isMobileDevice ? 'MOBILE' : 'PC';
         const blobFileSize = bytesToSize(blob.size);
         const recTime = document.getElementById('recordingStatus');
         const recType = 'Locally';
@@ -7040,10 +7355,14 @@ class RoomClient {
         if (volumeInput && audioPlayer) {
             console.log('Setting audio volume:', volumeValue);
             volumeInput.value = volumeValue;
-            if (isConsumer) {
-                this.toggleVolumeInput(volumeInput, volumeValue);
+            if (!audioPlayer.muted) {
+                if (isConsumer) {
+                    this.toggleVolumeInput(volumeInput, volumeValue);
+                }
+                this.setAudioVolume(audioPlayer, volume);
+            } else {
+                console.log('Audio player is muted, volume not adjusted.');
             }
-            this.setAudioVolume(audioPlayer, volume);
         }
     }
 
@@ -7332,6 +7651,9 @@ class RoomClient {
             case 'roomEmoji':
                 this.handleRoomEmoji(cmd);
                 break;
+            case 'transcriptionAll':
+                this.transcription.handleTranscriptionAll(cmd);
+                break;
             case 'transcript':
                 this.transcription.handleTranscript(cmd);
                 break;
@@ -7370,9 +7692,64 @@ class RoomClient {
             emojiDisplay.style.marginBottom = '5px';
             emojiDisplay.innerText = `${cmd.emoji} ${cmd.peer_name}`;
             userEmoji.appendChild(emojiDisplay);
+
             setTimeout(() => {
                 emojiDisplay.remove();
             }, duration);
+
+            this.handleEmojiSound(cmd);
+        }
+    }
+
+    handleEmojiSound(cmd) {
+        const path = '../sounds/emoji/';
+        const ext = '.mp3';
+        switch (cmd.shortcodes) {
+            case ':+1:':
+            case ':ok_hand:':
+                this.sound('ok', true, path, ext);
+                break;
+            case ':-1:':
+                this.sound('boo', true, path, ext);
+                break;
+            case ':clap:':
+                this.sound('applause', true, path, ext);
+                break;
+            case ':smiley:':
+            case ':grinning:':
+                this.sound('smile', true, path, ext);
+                break;
+            case ':joy:':
+                this.sound('laughs', true, path, ext);
+                break;
+            case ':tada:':
+                this.sound('congrats', true, path, ext);
+                break;
+            case ':open_mouth:':
+                this.sound('woah', true, path, ext);
+                break;
+            case ':trumpet:':
+                this.sound('trombone', true, path, ext);
+                break;
+            case ':kissing_heart:':
+                this.sound('kiss', true, path, ext);
+                break;
+            case ':heart:':
+            case ':hearts:':
+                this.sound('heart', true, path, ext);
+                break;
+            case ':rocket:':
+                this.sound('rocket', true, path, ext);
+                break;
+            case ':sparkles:':
+            case ':star:':
+            case ':star2:':
+            case ':dizzy:':
+                this.sound('tinkerbell', true, path, ext);
+                break;
+            // ...
+            default:
+                break;
         }
     }
 
@@ -7534,7 +7911,7 @@ class RoomClient {
                     break;
                 case 'hide':
                     if (peerActionAllowed) {
-                        this.closeProducer(mediaType.video);
+                        this.closeProducer(mediaType.video, 'moderator');
                         this.userLog(
                             'warning',
                             from_peer_name + '  ' + _PEER.videoOff + ' has closed yours video',
@@ -7556,7 +7933,7 @@ class RoomClient {
                 case 'stop':
                     if (this.isScreenShareSupported) {
                         if (peerActionAllowed) {
-                            this.closeProducer(mediaType.screen);
+                            this.closeProducer(mediaType.screen, 'moderator');
                             this.userLog(
                                 'warning',
                                 from_peer_name + '  ' + _PEER.screenOff + ' has closed yours screen share',
@@ -8144,39 +8521,8 @@ class RoomClient {
 
     popupPeerInfo(id, peer_info) {
         if (this.showPeerInfo && !this.isMobileDevice) {
-            //console.log('POPUP_PEER_INFO', peer_info);
-
-            // Destructuring peer_info
-            const {
-                join_data_time,
-                peer_name,
-                peer_presenter,
-                is_desktop_device,
-                is_mobile_device,
-                is_tablet_device,
-                is_ipad_pro_device,
-                os_name,
-                os_version,
-                browser_name,
-                browser_version,
-            } = peer_info;
-
-            const emojiPeerInfo = [
-                { label: 'Join Time', value: join_data_time, emoji: '⏰' },
-                { label: 'Name', value: peer_name, emoji: '👤' },
-                { label: 'Presenter', value: peer_presenter ? 'Yes' : 'No', emoji: peer_presenter ? '⭐' : '🎤' },
-                { label: 'Desktop Device', value: is_desktop_device ? 'Yes' : 'No', emoji: '💻' },
-                { label: 'Mobile Device', value: is_mobile_device ? 'Yes' : 'No', emoji: '📱' },
-                { label: 'Tablet Device', value: is_tablet_device ? 'Yes' : 'No', emoji: '📲' },
-                { label: 'iPad Pro', value: is_ipad_pro_device ? 'Yes' : 'No', emoji: '📱' },
-                { label: 'OS', value: `${os_name} ${os_version}`, emoji: '🖥️' },
-                { label: 'Browser', value: `${browser_name} ${browser_version}`, emoji: '🌐' },
-            ];
-
             // Format the peer info into a structured string
-            const peerInfoFormatted = emojiPeerInfo
-                .map((item) => `${item.emoji} <b>${item.label}:</b> ${item.value}`)
-                .join('<br/>');
+            const peerInfoFormatted = this.getPeerUiInfos();
 
             // Apply the improved Tippy.js tooltip
             this.setTippy(
@@ -8186,6 +8532,38 @@ class RoomClient {
                 true,
             );
         }
+    }
+
+    getPeerUiInfos() {
+        // console.log('PEER_INFO', peer_info);
+        const {
+            join_data_time,
+            peer_name,
+            peer_presenter,
+            is_desktop_device,
+            is_mobile_device,
+            is_tablet_device,
+            is_ipad_pro_device,
+            os_name,
+            os_version,
+            browser_name,
+            browser_version,
+        } = peer_info;
+
+        const emojiPeerInfo = [
+            { label: 'Join Time', value: join_data_time, emoji: '⏰' },
+            { label: 'Name', value: peer_name, emoji: '👤' },
+            { label: 'Presenter', value: peer_presenter ? 'Yes' : 'No', emoji: peer_presenter ? '⭐' : '🎤' },
+            { label: 'Desktop Device', value: is_desktop_device ? 'Yes' : 'No', emoji: '💻' },
+            { label: 'Mobile Device', value: is_mobile_device ? 'Yes' : 'No', emoji: '📱' },
+            { label: 'Tablet Device', value: is_tablet_device ? 'Yes' : 'No', emoji: '📲' },
+            { label: 'iPad Pro', value: is_ipad_pro_device ? 'Yes' : 'No', emoji: '📱' },
+            { label: 'OS', value: `${os_name} ${os_version}`, emoji: '🖥️' },
+            { label: 'Browser', value: `${browser_name} ${browser_version}`, emoji: '🌐' },
+        ];
+
+        // Format the peer info into a structured string
+        return emojiPeerInfo.map((item) => `${item.emoji} <b>${item.label}:</b> ${item.value}`).join('<br/>');
     }
 
     // ####################################################

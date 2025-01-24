@@ -55,7 +55,7 @@ dev dependencies: {
  * @license For commercial or closed source, contact us at license.mirotalk@gmail.com or purchase directly via CodeCanyon
  * @license CodeCanyon: https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970
  * @author  Miroslav Pejic - miroslav.pejic.85@gmail.com
- * @version 1.6.45
+ * @version 1.7.10
  *
  */
 
@@ -64,7 +64,7 @@ const { auth, requiresAuth } = require('express-openid-connect');
 const cors = require('cors');
 const compression = require('compression');
 const socketIo = require('socket.io');
-const https = require('httpolyglot');
+const httpolyglot = require('httpolyglot');
 const mediasoup = require('mediasoup');
 const mediasoupClient = require('mediasoup-client');
 const http = require('http');
@@ -131,14 +131,15 @@ const corsOptions = {
     methods: config.server?.cors?.methods || ['GET', 'POST'],
 };
 
-const httpsServer = https.createServer(options, app);
-const io = socketIo(httpsServer, {
+const server = httpolyglot.createServer(options, app);
+
+const io = socketIo(server, {
     maxHttpBufferSize: 1e7,
     transports: ['websocket'],
     cors: corsOptions,
 });
 
-const host = 'https://' + 'localhost' + ':' + config.server.listen.port; // config.server.listen.ip
+const host = config.server.hostUrl || `http://localhost:${config.server.listen.port}`;
 
 const jwtCfg = {
     JWT_KEY: (config.jwt && config.jwt.key) || 'mirotalksfu_jwt_secret',
@@ -188,6 +189,12 @@ if (sentryEnabled) {
     log.debug('test-debug');
 */
 }
+
+// Handle WebHook
+const webhook = {
+    enabled: config?.webhook?.enabled || false,
+    url: config?.webhook?.url || 'http://localhost:8888/webhook-endpoint',
+};
 
 // Discord Bot
 const { enabled, commands, token } = config.discord || {};
@@ -521,12 +528,16 @@ function startServer() {
 
             log.debug('Direct Join', req.query);
 
-            // http://localhost:3010/join?room=test&roomPassword=0&name=mirotalksfu&audio=1&video=1&screen=0&hide=0&notify=1
+            // http://localhost:3010/join?room=test&roomPassword=0&name=mirotalksfu&audio=1&video=1&screen=0&hide=0&notify=1&duration=00:00:30
             // http://localhost:3010/join?room=test&roomPassword=0&name=mirotalksfu&audio=1&video=1&screen=0&hide=0&notify=0&token=token
 
-            const { room, roomPassword, name, audio, video, screen, hide, notify, token, isPresenter } = checkXSS(
-                req.query,
-            );
+            const { room, roomPassword, name, audio, video, screen, hide, notify, duration, token, isPresenter } =
+                checkXSS(req.query);
+
+            if (!room) {
+                log.warn('/join/params room empty', room);
+                return res.redirect('/');
+            }
 
             if (!Validator.isValidRoomName(room)) {
                 return res.status(400).json({
@@ -603,12 +614,14 @@ function startServer() {
                 return res.sendFile(views.login);
             }
         }
+
+        return res.redirect('/');
     });
 
     // join room by id
     app.get('/join/:roomId', async (req, res) => {
         //
-        const { roomId } = req.params;
+        const { roomId } = checkXSS(req.params);
 
         if (!roomId) {
             log.warn('/join/:roomId empty', roomId);
@@ -632,7 +645,7 @@ function startServer() {
             // 2. Protect room access with configuration check
             if (!OIDC.enabled && hostCfg.protected && !hostCfg.users_from_db) {
                 const roomExists = hostCfg.users.some(
-                    (user) => user.allowed_rooms && user.allowed_rooms.includes(roomId),
+                    (user) => user.allowed_rooms && (user.allowed_rooms.includes(roomId) || roomList.has(roomId)),
                 );
                 log.debug('/join/:roomId exists from config allowed rooms', roomExists);
                 return roomExists ? res.sendFile(views.room) : res.redirect('/whoAreYou/' + roomId);
@@ -678,6 +691,9 @@ function startServer() {
 
     // handle login if user_auth enabled
     app.get(['/login'], (req, res) => {
+        if (!hostCfg.protected) {
+            return res.redirect('/');
+        }
         res.sendFile(views.login);
     });
 
@@ -750,7 +766,7 @@ function startServer() {
         if (serverRecordingEnabled) {
             //
             try {
-                const { fileName } = req.query;
+                const { fileName } = checkXSS(req.query);
 
                 if (!fileName) {
                     return res.status(400).send('Filename not provided');
@@ -915,9 +931,66 @@ function startServer() {
         res.sendStatus(200);
     });
 
+    // Join roomId redirect to /join?room=roomId
+    app.get('/:roomId', (req, res) => {
+        const { roomId } = checkXSS(req.params);
+
+        if (!roomId) {
+            log.warn('/:roomId empty', roomId);
+            return res.redirect('/');
+        }
+
+        log.debug('Detected roomId --> redirect to /join?room=roomId');
+        res.redirect(`/join/${roomId}`);
+    });
+
     // ####################################################
     // REST API
     // ####################################################
+
+    app.get([restApi.basePath + '/stats'], (req, res) => {
+        try {
+            // Check if endpoint allowed
+            if (restApi.allowed && !restApi.allowed.stats) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'This endpoint has been disabled. Please contact the administrator for further information.',
+                });
+            }
+            // check if user was authorized for the api call
+            const { host, authorization } = req.headers;
+            const api = new ServerApi(host, authorization);
+
+            if (!api.isAuthorized()) {
+                log.debug('MiroTalk get meetings - Unauthorized', {
+                    header: req.headers,
+                    body: req.body,
+                });
+                return res.status(403).json({ error: 'Unauthorized!' });
+            }
+
+            const { timestamp, totalRooms, totalUsers } = api.getStats(roomList);
+
+            res.json({
+                success: true,
+                timestamp,
+                totalRooms,
+                totalUsers,
+            });
+
+            // log.debug the output if all done
+            log.debug('MiroTalk get stats - Authorized', {
+                header: req.headers,
+                body: req.body,
+                timestamp,
+                totalRooms,
+                totalUsers,
+            });
+        } catch (error) {
+            console.error('Error fetching stats', error);
+            res.status(500).json({ success: false, error: 'Failed to retrieve stats.' });
+        }
+    });
 
     // request meetings list
     app.get([restApi.basePath + '/meetings'], (req, res) => {
@@ -1144,6 +1217,7 @@ function startServer() {
             stats_enabled: config.stats?.enabled ? config.stats : false,
             ngrok_enabled: config.ngrok?.enabled ? config.ngrok : false,
             email_alerts: config.email?.alert ? config.email : false,
+            webhook: webhook,
 
             // Version Information
             app_version: packageJson.version,
@@ -1176,7 +1250,7 @@ function startServer() {
     // START SERVER
     // ####################################################
 
-    httpsServer.listen(config.server.listen.port, () => {
+    server.listen(config.server.listen.port, () => {
         log.log(
             `%c
     
@@ -1222,9 +1296,9 @@ function startServer() {
             const worker = await mediasoup.createWorker({
                 logLevel: logLevel,
                 logTags: logTags,
-                rtcMinPort: rtcMinPort,
-                rtcMaxPort: rtcMaxPort,
-                disableLiburing: disableLiburing,
+                rtcMinPort: Number(rtcMinPort),
+                rtcMaxPort: Number(rtcMaxPort),
+                disableLiburing: Boolean(disableLiburing),
             });
 
             if (webRtcServerActive) {
@@ -1362,7 +1436,7 @@ function startServer() {
                         is_presenter =
                             presenter === '1' ||
                             presenter === 'true' ||
-                            (config.presenters.join_first && room.getPeers().size === 0);
+                            (config.presenters.join_first && room.getPeersCount() === 0);
 
                         log.debug('[Join] - HOST PROTECTED - USER AUTH check peer', {
                             ip: peer_ip,
@@ -1440,7 +1514,7 @@ function startServer() {
 
             const isPresenter = peer_token
                 ? is_presenter
-                : await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+                : isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
 
             const peer = room.getPeer(socket.id);
 
@@ -1486,6 +1560,15 @@ function startServer() {
                     os: os_name ? `${os_name} ${os_version}` : '',
                     browser: browser_name ? `${browser_name} ${browser_version}` : '',
                 }); // config.email.alert: true
+            }
+
+            // handle WebHook
+            if (webhook.enabled) {
+                // Trigger a POST request when a user joins
+                axios
+                    .post(webhook.url, { event: 'join', data })
+                    .then((response) => log.debug('Join event tracked:', response.data))
+                    .catch((error) => log.error('Error tracking join event:', error.message));
             }
 
             cb(room.toJson());
@@ -1535,9 +1618,7 @@ function startServer() {
                 callback(createWebRtcTransport);
             } catch (err) {
                 log.error('Create WebRtc Transport error', err);
-                callback({
-                    error: err.message,
-                });
+                callback({ error: err.message });
             }
         });
 
@@ -1560,9 +1641,7 @@ function startServer() {
                 callback(connectTransport);
             } catch (err) {
                 log.error('Connect transport error', err);
-                callback({
-                    error: err.message,
-                });
+                callback({ error: err.message });
             }
         });
 
@@ -1595,9 +1674,7 @@ function startServer() {
                 callback(iceParameters);
             } catch (err) {
                 log.error('Restart ICE error', err);
-                callback({
-                    error: err.message,
-                });
+                callback({ error: err.message });
             }
         });
 
@@ -1614,7 +1691,6 @@ function startServer() {
 
             const { peer_name } = peer || 'undefined';
 
-            // peer_info.audio OR video ON
             const data = {
                 room_id: room.id,
                 peer_name: peer_name,
@@ -1649,20 +1725,14 @@ function startServer() {
                     room.addProducerToActiveSpeakerObserver({ producerId: producer_id });
                 }
 
-                //log.debug('Producer transport callback', { callback: producer_id });
-
-                callback({
-                    producer_id,
-                });
+                callback({ producer_id });
             } catch (err) {
                 log.error('Producer transport error', err);
-                callback({
-                    error: err.message,
-                });
+                callback({ error: err.message });
             }
         });
 
-        socket.on('consume', async ({ consumerTransportId, producerId, rtpCapabilities }, callback) => {
+        socket.on('consume', async ({ consumerTransportId, producerId, rtpCapabilities, type }, callback) => {
             if (!roomExists(socket)) {
                 return callback({ error: 'Room not found' });
             }
@@ -1672,22 +1742,19 @@ function startServer() {
             const { peer_name } = peer || 'undefined';
 
             try {
-                const params = await room.consume(socket.id, consumerTransportId, producerId, rtpCapabilities);
+                const params = await room.consume(socket.id, consumerTransportId, producerId, rtpCapabilities, type);
 
                 log.debug('Consuming', {
                     peer_name: peer_name,
+                    producer_type: type,
                     producer_id: producerId,
                     consumer_id: params ? params.id : undefined,
                 });
 
-                //log.debug('Consumer transport callback', { callback: params });
-
                 callback(params);
             } catch (err) {
                 log.error('Consumer transport error', err);
-                callback({
-                    error: err.message,
-                });
+                callback({ error: err.message });
             }
         });
 
@@ -1703,94 +1770,94 @@ function startServer() {
             room.closeProducer(socket.id, data.producer_id);
         });
 
-        socket.on('pauseProducer', async ({ producer_id }, callback) => {
+        socket.on('pauseProducer', async ({ producer_id, type }, callback) => {
             if (!roomExists(socket)) return;
 
             const peer = getPeer(socket);
 
             if (!peer) {
                 return callback({
-                    error: `Peer with ID: ${socket.id} for producer with id "${producer_id}" not found`,
+                    error: `Peer with ID: ${socket.id} for producer with id "${producer_id}" type "${type}" not found`,
                 });
             }
 
             const producer = peer.getProducer(producer_id);
 
             if (!producer) {
-                return callback({ error: `Producer with id "${producer_id}" not found` });
+                return callback({ error: `Producer with id "${producer_id}" type "${type}" not found` });
             }
 
             try {
                 await producer.pause();
+
+                const { peer_name } = peer || 'undefined';
+
+                log.debug('Producer paused', { peer_name, producer_id, type });
+
+                callback('successfully');
             } catch (error) {
-                return callback({ error: error.message });
+                callback({ error: error.message });
             }
-
-            const { peer_name } = peer || 'undefined';
-
-            log.debug('Producer paused', { peer_name: peer_name, producer_id: producer_id });
-
-            callback('successfully');
         });
 
-        socket.on('resumeProducer', async ({ producer_id }, callback) => {
+        socket.on('resumeProducer', async ({ producer_id, type }, callback) => {
             if (!roomExists(socket)) return;
 
             const peer = getPeer(socket);
 
             if (!peer) {
                 return callback({
-                    error: `peer with ID: "${socket.id}" for producer with id "${producer_id}" not found`,
+                    error: `peer with ID: "${socket.id}" for producer with id "${producer_id}" type "${type}" not found`,
                 });
             }
 
             const producer = peer.getProducer(producer_id);
 
             if (!producer) {
-                return callback({ error: `producer with id "${producer_id}" not found` });
+                return callback({ error: `producer with id "${producer_id}" type "${type}" not found` });
             }
 
             try {
                 await producer.resume();
+
+                const { peer_name } = peer || 'undefined';
+
+                log.debug('Producer resumed', { peer_name, producer_id, type });
+
+                callback('successfully');
             } catch (error) {
-                return callback({ error: error.message });
+                callback({ error: error.message });
             }
-
-            const { peer_name } = peer || 'undefined';
-
-            log.debug('Producer resumed', { peer_name: peer_name, producer_id: producer_id });
-
-            callback('successfully');
         });
 
-        socket.on('resumeConsumer', async ({ consumer_id }, callback) => {
+        socket.on('resumeConsumer', async ({ consumer_id, type }, callback) => {
             if (!roomExists(socket)) return;
 
             const peer = getPeer(socket);
 
             if (!peer) {
                 return callback({
-                    error: `peer with ID: "${socket.id}" for consumer with id "${consumer_id}" not found`,
+                    error: `peer with ID: "${socket.id}" for consumer with id "${consumer_id}" type "${type}" not found`,
                 });
             }
 
             const consumer = peer.getConsumer(consumer_id);
 
             if (!consumer) {
-                return callback({ error: `consumer with id "${consumer_id}" not found` });
+                return callback({ error: `consumer with id "${consumer_id}" type "${type}" not found` });
             }
 
             try {
                 await consumer.resume();
+
+                const { peer_name } = peer || 'undefined';
+
+                log.debug('Consumer resumed', { peer_name, consumer_id, type });
+
+                callback('successfully');
             } catch (error) {
-                return callback({ error: error.message });
+                callback({ error: error.message });
             }
-
-            const { peer_name } = peer || 'undefined';
-
-            log.debug('Consumer resumed', { peer_name: peer_name, consumer_id: consumer_id });
-
-            callback('successfully');
         });
 
         socket.on('getProducers', () => {
@@ -1837,7 +1904,7 @@ function startServer() {
                     break;
                 case 'ejectAll':
                     const { peer_name, peer_uuid } = data;
-                    const isPresenter = await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+                    const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
                     if (!isPresenter) return;
                     break;
                 case 'peerAudio':
@@ -1859,7 +1926,7 @@ function startServer() {
 
             const data = checkXSS(dataObject);
 
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
 
             const room = getRoom(socket);
 
@@ -1975,7 +2042,7 @@ function startServer() {
             ];
 
             if (presenterActions.some((v) => data.action === v)) {
-                const isPresenter = await isPeerPresenter(
+                const isPresenter = isPeerPresenter(
                     socket.room_id,
                     socket.id,
                     data.from_peer_name,
@@ -2010,14 +2077,14 @@ function startServer() {
             }
         });
 
-        socket.on('updateRoomModerator', async (dataObject) => {
+        socket.on('updateRoomModerator', (dataObject) => {
             if (!roomExists(socket)) return;
 
             const data = checkXSS(dataObject);
 
             const room = getRoom(socket);
 
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
 
             if (!isPresenter) return;
 
@@ -2039,14 +2106,14 @@ function startServer() {
             }
         });
 
-        socket.on('updateRoomModeratorALL', async (dataObject) => {
+        socket.on('updateRoomModeratorALL', (dataObject) => {
             if (!roomExists(socket)) return;
 
             const data = checkXSS(dataObject);
 
             const room = getRoom(socket);
 
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, data.peer_name, data.peer_uuid);
 
             if (!isPresenter) return;
 
@@ -2189,7 +2256,7 @@ function startServer() {
 
             const room = getRoom(socket);
 
-            const peerCounts = room.getPeers().size;
+            const peerCounts = room.getPeersCount();
 
             const data = {
                 room_id: socket.room_id,
@@ -2560,7 +2627,7 @@ function startServer() {
 
             const data = checkXSS(dataObject);
             const { peer_name, peer_uuid, file } = data;
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
             if (!isPresenter) return cb(false);
 
             const room = getRoom(socket);
@@ -2604,7 +2671,7 @@ function startServer() {
 
             const data = checkXSS(dataObject);
             const { peer_name, peer_uuid, inputVideoURL } = data;
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
             if (!isPresenter) return cb(false);
 
             const room = getRoom(socket);
@@ -2717,7 +2784,7 @@ function startServer() {
             const { index, peer_name, peer_uuid } = checkXSS(data);
 
             // Disable for now...
-            // const isPresenter = await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+            // const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
             // if (!isPresenter) return;
 
             const room = getRoom(socket);
@@ -2767,20 +2834,20 @@ function startServer() {
             room.broadCast(socket.id, 'editorUpdate', data);
         });
 
-        socket.on('disconnect', async () => {
+        socket.on('disconnect', (reason) => {
             if (!roomExists(socket)) return;
 
             const { room, peer } = getRoomAndPeer(socket);
 
             const { peer_name, peer_uuid } = peer || {};
 
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
 
-            log.debug('[Disconnect] - peer name', peer_name);
+            log.debug('[Disconnect] - peer name', { peer_name, reason });
 
             room.removePeer(socket.id);
 
-            if (room.getPeers().size === 0) {
+            if (room.getPeersCount() === 0) {
                 //
                 stopRTMPActiveStreams(isPresenter, room);
 
@@ -2803,10 +2870,25 @@ function startServer() {
 
             if (isPresenter) removeIP(socket);
 
+            if (webhook.enabled) {
+                const data = {
+                    timestamp: log.getDateTime(false),
+                    room_id: socket.room_id,
+                    peer_name: peer_name,
+                    presenter: isPresenter,
+                    reason: reason,
+                };
+                // Trigger a POST request when a user disconnects
+                axios
+                    .post(webhook.url, { event: 'disconnect', data })
+                    .then((response) => log.debug('Disconnect event tracked:', response.data))
+                    .catch((error) => log.error('Error tracking disconnect event:', error.message));
+            }
+
             socket.room_id = null;
         });
 
-        socket.on('exitRoom', async (_, callback) => {
+        socket.on('exitRoom', (_, callback) => {
             if (!roomExists(socket)) {
                 return callback({
                     error: 'Not currently in a room',
@@ -2817,7 +2899,7 @@ function startServer() {
 
             const { peer_name, peer_uuid } = peer || {};
 
-            const isPresenter = await isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
+            const isPresenter = isPeerPresenter(socket.room_id, socket.id, peer_name, peer_uuid);
 
             log.debug('Exit room', peer_name);
 
@@ -2825,7 +2907,7 @@ function startServer() {
 
             room.broadCast(socket.id, 'removeMe', removeMeData(room, peer_name, isPresenter));
 
-            if (room.getPeers().size === 0) {
+            if (room.getPeersCount() === 0) {
                 //
                 stopRTMPActiveStreams(isPresenter, room);
 
@@ -2844,14 +2926,28 @@ function startServer() {
                 log.info('[REMOVE ME] - Last peer - current active RTMP streams', activeStreams);
             }
 
-            socket.room_id = null;
-
             if (isPresenter) removeIP(socket);
+
+            if (webhook.enabled) {
+                const data = {
+                    timestamp: log.getDateTime(false),
+                    room_id: socket.room_id,
+                    peer_name: peer_name,
+                    presenter: isPresenter,
+                };
+                // Trigger a POST request when a user exits
+                axios
+                    .post(webhook.url, { event: 'exit', data })
+                    .then((response) => log.debug('ExitROom event tracked:', response.data))
+                    .catch((error) => log.error('Error tracking exitRoom event:', error.message));
+            }
+
+            socket.room_id = null;
 
             callback('Successfully exited room');
         });
 
-        // common
+        // Helpers
 
         function getRoomAndPeer(socket) {
             const room = getRoom(socket);
@@ -2896,7 +2992,7 @@ function startServer() {
 
         function removeMeData(room, peerName, isPresenter) {
             const roomId = room && socket.room_id;
-            const peerCounts = room && room.getPeers().size;
+            const peerCounts = room && room.getPeersCount();
             const data = {
                 room_id: roomId,
                 peer_id: socket.id,
@@ -2962,7 +3058,7 @@ function startServer() {
         return JSON.parse(JSON.stringify(value));
     }
 
-    async function isPeerPresenter(room_id, peer_id, peer_name, peer_uuid) {
+    function isPeerPresenter(room_id, peer_id, peer_name, peer_uuid) {
         try {
             if (
                 config.presenters &&
@@ -3095,7 +3191,7 @@ function startServer() {
         const roomIds = Array.from(roomList.keys());
         const roomPeersArray = roomIds.map((roomId) => {
             const room = roomList.get(roomId);
-            const peerCount = (room && room.getPeers().size) || 0;
+            const peerCount = (room && room.getPeersCount()) || 0;
             const broadcasting = (room && room.isBroadcasting()) || false;
             return {
                 room: roomId,

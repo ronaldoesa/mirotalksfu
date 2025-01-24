@@ -4,9 +4,11 @@
 
 <div align="center">
 
-<a href="">[![Author](https://img.shields.io/badge/Author-miroslav-brightgreen.svg)](https://www.linkedin.com/in/miroslav-pejic-976a07101/)</a>
-<a href="">![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3-blue.svg)</a>
-<a href="">[![Community](https://img.shields.io/badge/Community-forum-pink.svg)](https://discord.gg/rgGYfeYW3N)</a>
+<a href="https://www.linkedin.com/in/miroslav-pejic-976a07101/">![Author](https://img.shields.io/badge/Author-Miroslav_Pejic-brightgreen.svg)</a>
+<a href="https://choosealicense.com/licenses/agpl-3.0/">![License: AGPLv3](https://img.shields.io/badge/License-AGPLv3_Open_Surce-blue.svg)</a>
+<a href="https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970">![License: Regular](https://img.shields.io/badge/License-Regular_Private_Use-lightblue.svg)</a>
+<a href="https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970">![License: Extended](https://img.shields.io/badge/License-Extended_Commercial_Use-darkgreen.svg)</a>
+<a href="https://discord.gg/rgGYfeYW3N">![Community](https://img.shields.io/badge/Community-forum-pink.svg)</a>
 
 </div>
 
@@ -60,7 +62,7 @@
 - File sharing with drag-and-drop support.
 - Choose your audio input, output, and video source.
 - Supports video quality up to 4K.
-- Supports advance Picture-in-Picture (PiP) offering a more streamlined and flexible viewing experience.
+- Supports advance Video/Document Picture-in-Picture (PiP) offering a more streamlined and flexible viewing experience.
 - Record your screen, audio, and video locally or on your Server.
 - Snapshot video frames and save them as PNG images.
 - Chat with an Emoji Picker for expressing feelings, private messages, Markdown support, and conversation saving.
@@ -72,6 +74,7 @@
 - Advanced collaborative powerful rich text editor.
 - Real-time sharing of YouTube embed videos, video files (MP4, WebM, OGG), and audio files (MP3).
 - Real-time polls, allows users to create and participate in live polls, providing instant feedback and results.
+- Meeting Duration (HH:MM:SS): Set the meeting time in hours, minutes, and seconds for precise duration control.
 - Integrated RTMP server, fully compatible with **[OBS](https://obsproject.com)**.
 - Supports RTMP streaming from files, URLs, webcams, screens, and windows.
 - Full-screen mode with one-click video element zooming and pin/unpin.
@@ -102,19 +105,20 @@
 <br/>
 
 - You can `directly join a room` by using link like:
-- https://sfu.mirotalk.com/join?room=test&roomPassword=0&name=mirotalksfu&audio=0&video=0&screen=0&notify=0
+- https://sfu.mirotalk.com/join?room=test&roomPassword=0&name=mirotalksfu&audio=0&video=0&screen=0&notify=0&duration=unlimited
 
-    | Params       | Type           | Description     |
-    | ------------ | -------------- | --------------- |
-    | room         | string         | Room Id         |
-    | roomPassword | string/boolean | Room password   |
-    | name         | string         | User name       |
-    | audio        | boolean        | Audio stream    |
-    | video        | boolean        | Video stream    |
-    | screen       | boolean        | Screen stream   |
-    | notify       | boolean        | Welcome message |
-    | hide         | boolean        | Hide myself     |
-    | token        | string         | JWT             |
+    | Params       | Type           | Description               |
+    | ------------ | -------------- | ------------------------- |
+    | room         | string         | Room Id                   |
+    | roomPassword | string/boolean | Room password             |
+    | name         | string         | User name                 |
+    | audio        | boolean        | Audio stream              |
+    | video        | boolean        | Video stream              |
+    | screen       | boolean        | Screen stream             |
+    | notify       | boolean        | Welcome message           |
+    | hide         | boolean        | Hide myself               |
+    | duration     | string         | Meeting duration HH:MM:SS |
+    | token        | string         | JWT                       |
 
 </details>
 
@@ -141,31 +145,18 @@ Example:
             {
                 username: 'username',
                 password: 'password',
+                displayname: 'displayname',
+                allowed_rooms: ['*'],
             },
             {
                 username: 'username2',
                 password: 'password2',
+                displayname: 'displayname2',
+                allowed_rooms: ['room1', 'room2'],
             },
             //...
         ],
     },
-```
-
-</details>
-
-<details open>
-<summary>Embed a meeting</summary>
-
-<br/>
-
-To embed a meeting within `your service or app` using an iframe, you can use the following code:
-
-```html
-<iframe
-    allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
-    src="https://sfu.mirotalk.com/newroom"
-    style="height: 100vh; width: 100vw; border: 0px;"
-></iframe>
 ```
 
 </details>
@@ -259,6 +250,25 @@ $ docker-compose down
 
 </details>
 
+<details open>
+<summary>Embed a meeting</summary>
+
+<br/>
+
+![iframe](public/images/iframe.png)
+
+To embed a meeting within `your service or app` using an iframe, you can use the following code:
+
+```html
+<iframe
+    allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; web-share; autoplay"
+    src="https://sfu.mirotalk.com/newroom"
+    style="height: 100vh; width: 100vw; border: 0px;"
+></iframe>
+```
+
+</details>
+
 <details>
 <summary>Documentations</summary>
 
@@ -271,6 +281,9 @@ $ docker-compose down
 - `Rest API:` The [API documentation](https://docs.mirotalk.com/mirotalk-sfu/api/) uses [swagger](https://swagger.io/) at https://localhost:3010/api/v1/docs or check it on live [here](https://sfu.mirotalk.com/api/v1/docs).
 
 ```bash
+# The response will give you the total of rooms and users.
+$ curl -X GET "http://localhost:3010/api/v1/stats" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json"
+$ curl -X GET "https://sfu.mirotalk.com/api/v1/stats" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json"
 # The response will give you the active meetings (default disabled).
 $ curl -X GET "http://localhost:3010/api/v1/meetings" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json"
 $ curl -X GET "https://sfu.mirotalk.com/api/v1/meetings" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json"
@@ -278,11 +291,11 @@ $ curl -X GET "https://sfu.mirotalk.com/api/v1/meetings" -H "authorization: miro
 $ curl -X POST "http://localhost:3010/api/v1/meeting" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json"
 $ curl -X POST "https://sfu.mirotalk.com/api/v1/meeting" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json"
 # The response will give you a entrypoint / URL for the direct join to the meeting.
-$ curl -X POST "http://localhost:3010/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false"}'
-$ curl -X POST "https://sfu.mirotalk.com/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false"}'
+$ curl -X POST "http://localhost:3010/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false","duration":"unlimited"}'
+$ curl -X POST "https://sfu.mirotalk.com/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false","duration":"unlimited"}'
 # The response will give you a entrypoint / URL for the direct join to the meeting with a token.
-$ curl -X POST "http://localhost:3010/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false","token":{"username":"username","password":"password","presenter":"true", "expire":"1h"}}'
-$ curl -X POST "https://sfu.mirotalk.com/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false","token":{"username":"username","password":"password","presenter":"true", "expire":"1h"}}'
+$ curl -X POST "http://localhost:3010/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false","duration":"unlimited","token":{"username":"username","password":"password","presenter":"true", "expire":"1h"}}'
+$ curl -X POST "https://sfu.mirotalk.com/api/v1/join" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"room":"test","roomPassword":"false","name":"mirotalksfu","audio":"false","video":"false","screen":"false","notify":"false","duration":"unlimited","token":{"username":"username","password":"password","presenter":"true", "expire":"1h"}}'
 # The response will give you a valid token for a meeting (default diabled)
 $ curl -X POST "http://localhost:3010/api/v1/token" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"username":"username","password":"password","presenter":"true", "expire":"1h"}'
 $ curl -X POST "https://sfu.mirotalk.com/api/v1/token" -H "authorization: mirotalksfu_default_secret" -H "Content-Type: application/json" --data '{"username":"username","password":"password","presenter":"true", "expire":"1h"}'
@@ -291,7 +304,7 @@ $ curl -X POST "https://sfu.mirotalk.com/api/v1/token" -H "authorization: mirota
 </details>
 
 <details open>
-<summary>Hetzner & Contabo</summary>
+<summary>Hetzner, Hostinger & Contabo</summary>
 
 <br/>
 
@@ -305,9 +318,15 @@ Use [my personal link](https://hetzner.cloud/?ref=XdRifCzCK3bn) to receive `€�
 
 ---
 
+[![Hostinger](public/advertisers/HostingerLogo.png)](https://hostinger.com/?REFERRALCODE=MIROTALK)
+
+Fast, reliable hosting with 24/7 support and great performance. Start today! [Check out Hostinger now](https://hostinger.com/?REFERRALCODE=MIROTALK)
+
+---
+
 [![Contabo](public/advertisers/ContaboLogo.png)](https://www.dpbolvw.net/click-101027391-14462707)
 
-Experience also top-tier German web hosting – dedicated servers, VPS, and web hosting at `unbeatable prices`. Reliable, secure, and backed by 24/7 support. [Explore now here](https://www.dpbolvw.net/click-101027391-14462707)
+Experience also top-tier German web hosting – dedicated servers, VPS, and web hosting at `unbeatable prices`. [Explore now here](https://www.dpbolvw.net/click-101027391-14462707)
 
 ---
 
@@ -384,7 +403,9 @@ Do you find MiroTalk SFU indispensable for your needs? Join us in supporting thi
 
 ---
 
-[![Contabo](public/advertisers/ContaboLogo.png)](https://www.dpbolvw.net/click-101027391-14462707)
+|                                                                                                |                                                                                                |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [![Hostinger](public/advertisers/Hostinger.png)](https://hostinger.com/?REFERRALCODE=MIROTALK) | [![Contabo](public/advertisers/Contabo.png)](https://www.dpbolvw.net/click-101027391-14462707) |
 
 ---
 

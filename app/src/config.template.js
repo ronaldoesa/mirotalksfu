@@ -2,6 +2,25 @@
 
 const os = require('os');
 
+// #############################
+// HELPERS
+// #############################
+
+const platform = os.platform();
+
+function getFFmpegPath(platform) {
+    switch (platform) {
+        case 'darwin':
+            return '/usr/local/bin/ffmpeg'; // macOS
+        case 'linux':
+            return '/usr/bin/ffmpeg'; // Linux
+        case 'win32':
+            return 'C:\\ffmpeg\\bin\\ffmpeg.exe'; // Windows
+        default:
+            return '/usr/bin/ffmpeg'; // Centos or others...
+    }
+}
+
 // https://api.ipify.org
 
 function getIPv4() {
@@ -18,18 +37,32 @@ function getIPv4() {
 }
 
 /*
-IPv4 Configuration Guide:
-    1. Localhost Setup:
-        - For local development with Docker, replace `getIPv4()` with '127.0.0.1'.
-    2. Production Setup:
-        - Replace `getIPv4()` with the 'Public Static IPv4 Address' of the server hosting this application.
-        - For AWS EC2 instances, replace `getIPv4()` with the 'Elastic IP' associated with the instance. 
-        This ensures the public IP remains consistent across instance reboots.
+    IPv4 Configuration Guide:
+        1. Localhost Setup:
+            - For local development with Docker, replace `getIPv4()` with '127.0.0.1'.
+        2. Production Setup:
+            - Replace `getIPv4()` with the 'Public Static IPv4 Address' of the server hosting this application.
+            - For AWS EC2 instances, replace `getIPv4()` with the 'Elastic IP' associated with the instance. 
+            This ensures the public IP remains consistent across instance reboots.
     Note: Always enclose the IP address in single quotes ''.
 */
 const IPv4 = getIPv4(); // Replace with the appropriate IPv4 address for your environment.
 
+/*
+    Set the port range for WebRTC communication. This range is used for the dynamic allocation of UDP ports for media streams.
+        - Each participant requires 2 ports: one for audio and one for video.
+        - The default configuration supports up to 50 participants (50 * 2 ports = 100 ports).
+        - To support more participants, simply increase the port range.
+    Note: 
+    - When running in Docker, use 'network mode: host' for improved performance.
+    - Alternatively, enable 'webRtcServerActive: true' mode for better scalability.
+*/
+const rtcMinPort = 40000;
+const rtcMaxPort = 40100;
+
 const numWorkers = require('os').cpus().length;
+
+const ffmpegPath = getFFmpegPath(platform);
 
 module.exports = {
     console: {
@@ -41,6 +74,7 @@ module.exports = {
         colors: true,
     },
     server: {
+        hostUrl: '', // default to http://localhost:port
         listen: {
             // app listen on
             ip: '0.0.0.0',
@@ -86,7 +120,8 @@ module.exports = {
                 - apiSecret: The API secret for streaming WebRTC to RTMP through the MiroTalk API.
                 - expirationHours: The number of hours before the RTMP URL expires. Default is 4 hours.
                 - dir: Directory where your video files are stored to be streamed via RTMP.
-                - ffmpeg: Path of the ffmpeg installation on the system (which ffmpeg)
+                - ffmpegPath: Path of the ffmpeg installation on the system (which ffmpeg)
+                - platform: 'darwin', 'linux', 'win32', etc.
 
                 Important: Before proceeding, make sure your RTMP server is up and running. 
                 For more information, refer to the documentation here: https://docs.mirotalk.com/mirotalk-sfu/rtmp/.
@@ -107,7 +142,8 @@ module.exports = {
             apiSecret: 'mirotalkRtmpApiSecret',
             expirationHours: 4,
             dir: 'rtmp',
-            ffmpeg: '/usr/bin/ffmpeg',
+            ffmpegPath: ffmpegPath,
+            platform: platform,
         },
     },
     middleware: {
@@ -126,6 +162,7 @@ module.exports = {
         keySecret: 'mirotalksfu_default_secret',
         // Define which endpoints are allowed
         allowed: {
+            stats: true,
             meetings: false,
             meeting: true,
             join: true,
@@ -289,6 +326,14 @@ module.exports = {
         DSN: '',
         tracesSampleRate: 0.5,
     },
+    webhook: {
+        /*
+            Enable or disable webhook functionality.
+            Set `enabled` to `true` to activate webhook sending of socket events (join, exitRoom, disconnect)
+        */
+        enabled: false,
+        url: 'https://your-site.com/webhook-endpoint',
+    },
     mattermost: {
         /*
         Mattermost: https://mattermost.com
@@ -387,6 +432,7 @@ module.exports = {
     ui: {
         /*
             Customize your MiroTalk instance
+            Branding and customizations require a license: https://codecanyon.net/item/mirotalk-sfu-webrtc-realtime-video-conferences/40769970
         */
         brand: {
             app: {
@@ -442,6 +488,7 @@ module.exports = {
                 raiseHandButton: true,
                 transcriptionButton: true,
                 whiteboardButton: true,
+                documentPiPButton: true,
                 snapshotRoomButton: true,
                 emojiRoomButton: true,
                 settingsButton: true,
@@ -461,6 +508,7 @@ module.exports = {
                 tabRecording: true,
                 host_only_recording: true, // presenter
                 pushToTalk: true,
+                keyboardShortcuts: true,
             },
             producerVideo: {
                 videoPictureInPicture: true,
@@ -539,8 +587,8 @@ module.exports = {
         // Worker settings
         numWorkers: numWorkers,
         worker: {
-            rtcMinPort: 40000,
-            rtcMaxPort: 40100,
+            rtcMinPort: rtcMinPort,
+            rtcMaxPort: rtcMaxPort,
             disableLiburing: false, // https://github.com/axboe/liburing
             logLevel: 'error',
             logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp', 'rtx', 'bwe', 'score', 'simulcast', 'svc', 'sctp'],
@@ -569,7 +617,16 @@ module.exports = {
                     mimeType: 'video/VP9',
                     clockRate: 90000,
                     parameters: {
-                        'profile-id': 2,
+                        'profile-id': 0, // Default profile for wider compatibility
+                        'x-google-start-bitrate': 1000,
+                    },
+                },
+                {
+                    kind: 'video',
+                    mimeType: 'video/VP9',
+                    clockRate: 90000,
+                    parameters: {
+                        'profile-id': 2, // High profile for modern devices
                         'x-google-start-bitrate': 1000,
                     },
                 },
@@ -579,7 +636,7 @@ module.exports = {
                     clockRate: 90000,
                     parameters: {
                         'packetization-mode': 1,
-                        'profile-level-id': '4d0032',
+                        'profile-level-id': '42e01f', // Baseline profile for compatibility
                         'level-asymmetry-allowed': 1,
                         'x-google-start-bitrate': 1000,
                     },
@@ -590,7 +647,7 @@ module.exports = {
                     clockRate: 90000,
                     parameters: {
                         'packetization-mode': 1,
-                        'profile-level-id': '42e01f',
+                        'profile-level-id': '4d0032', // High profile for modern devices
                         'level-asymmetry-allowed': 1,
                         'x-google-start-bitrate': 1000,
                     },
@@ -601,38 +658,38 @@ module.exports = {
         webRtcServerActive: false,
         webRtcServerOptions: {
             listenInfos: [
-                // { protocol: 'udp', ip: '0.0.0.0', announcedAddress: IPv4, port: 40000 },
-                // { protocol: 'tcp', ip: '0.0.0.0', announcedAddress: IPv4, port: 40000 },
+                // { protocol: 'udp', ip: '0.0.0.0', announcedAddress: IPv4, port: rtcMinPort },
+                // { protocol: 'tcp', ip: '0.0.0.0', announcedAddress: IPv4, port: rtcMinPort },
                 {
                     protocol: 'udp',
                     ip: '0.0.0.0',
                     announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40000 + numWorkers },
+                    portRange: { min: rtcMinPort, max: rtcMinPort + numWorkers },
                 },
                 {
                     protocol: 'tcp',
                     ip: '0.0.0.0',
                     announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40000 + numWorkers },
+                    portRange: { min: rtcMinPort, max: rtcMinPort + numWorkers },
                 },
             ],
         },
         // WebRtcTransportOptions
         webRtcTransport: {
             listenInfos: [
-                // { protocol: 'udp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
-                // { protocol: 'tcp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
+                // { protocol: 'udp', ip: IPv4, portRange: { min: rtcMinPort, max: rtcMaxPort } },
+                // { protocol: 'tcp', ip: IPv4, portRange: { min: rtcMinPort, max: rtcMaxPort } },
                 {
                     protocol: 'udp',
                     ip: '0.0.0.0',
                     announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40100 },
+                    portRange: { min: rtcMinPort, max: rtcMaxPort },
                 },
                 {
                     protocol: 'tcp',
                     ip: '0.0.0.0',
                     announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40100 },
+                    portRange: { min: rtcMinPort, max: rtcMaxPort },
                 },
             ],
             initialAvailableOutgoingBitrate: 1000000,
