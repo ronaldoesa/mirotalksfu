@@ -2061,7 +2061,7 @@ class RoomClient {
                 this.myVideoEl = elem;
                 this.isVideoPictureInPictureSupported && this.handlePIP(elem.id, pip.id);
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
-                this.handleVB(d.id, vb.id);
+                this.handleVB(d.id, vb.id, this.peer_name);
                 this.handleDD(elem.id, this.peer_id, true);
                 this.handleTS(elem.id, ts.id);
                 this.handleMV(elem.id, mv.id);
@@ -2545,7 +2545,7 @@ class RoomClient {
 
                 this.isVideoPictureInPictureSupported && this.handlePIP(elem.id, pip.id);
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
-                this.handleVB(d.id, vb.id);
+                this.handleVB(d.id, vb.id, peer_name);
                 this.handleDD(elem.id, remotePeerId);
                 this.handleTS(elem.id, ts.id);
                 this.handleMV(elem.id, mv.id);
@@ -2802,7 +2802,7 @@ class RoomClient {
             this.handlePV(this.audioConsumers.get(pv.id) + '___' + pv.id);
         }
 
-        this.handleVB(d.id, vb.id);
+        this.handleVB(d.id, vb.id, peer_name);
         this.handleDD(d.id, peer_id, !remotePeer);
         this.popupPeerInfo(p.id, peer_info);
         this.checkPeerInfoStatus(peer_info);
@@ -3895,11 +3895,14 @@ class RoomClient {
     // HANDLE VIDEO AND MENU BAR
     // ####################################################
 
-    handleVB(videoId, videoBarId) {
+    handleVB(videoId, videoBarId, peer_name) {
         const videoPlayer = this.getId(videoId);
         const videoBar = this.getId(videoBarId);
         if (videoPlayer && videoBar) {
-            videoPlayer.addEventListener('click', () => {
+            console.log(peer_name);
+
+            if(!peer_name.includes('Surveyor'))
+            {
                 const videoMenuBar = rc.getEcN('videoMenuBar');
                 for (let i = 0; i < videoMenuBar.length; i++) {
                     const menuBar = videoMenuBar[i];
@@ -3922,7 +3925,7 @@ class RoomClient {
                     });
                     videoPlayer.style.border = 'none';
                 }
-            });
+            }
         }
     }
 
