@@ -1106,7 +1106,7 @@ async function whoAreYou() {
         background: swalBackground,
         title: BRAND.app.name,
         input: 'text',
-        inputPlaceholder: 'Enter your email or name',
+        inputPlaceholder: 'Enter your name',
         inputAttributes: { maxlength: 32, id: 'usernameInput' },
         inputValue: default_name,
         html: initUser, // Inject HTML
@@ -1419,7 +1419,7 @@ function roomIsReady() {
     } else {
         myProfileAvatar.setAttribute('src', rc.genAvatarSvg(peer_name, 64));
     }
-    show(toggleExtraButton); //*
+    hide(toggleExtraButton); //*
     BUTTONS.main.exitButton && show(exitButton);
     BUTTONS.main.shareButton && show(shareButton);
     BUTTONS.main.hideMeButton && show(hideMeButton);
