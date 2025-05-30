@@ -1062,7 +1062,12 @@ function startServer() {
             await containerClient.createIfNotExists();
             const blobPath = `${env}/${folderName}/${caseName}/${fileName}`;
             const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
-            await blockBlobClient.uploadData(snapshotBuffer);
+            //await blockBlobClient.uploadData(snapshotBuffer);
+            await blockBlobClient.uploadData(snapshotBuffer, {
+                blobHTTPHeaders: {
+                    blobContentType: matches[1], // Set the content type based on the data URL
+                }
+            });
             console.log(`Uploaded: ${fileName}`);
         } catch (error) {
             console.error("Azure upload failed:", error);
