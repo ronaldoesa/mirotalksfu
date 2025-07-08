@@ -2063,7 +2063,7 @@ class RoomClient {
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
                 this.handleVB(d.id, vb.id, this.peer_name);
                 this.handleDD(elem.id, this.peer_id, true);
-                this.handleTS(elem.id, ts.id);
+                this.handleTS(elem.id, ts.id, this.peer_name);
                 this.handleMV(elem.id, mv.id);
                 this.handlePN(elem.id, pn.id, d.id, isScreen);
                 this.handleZV(elem.id, d.id, this.peer_id);
@@ -2547,7 +2547,7 @@ class RoomClient {
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
                 this.handleVB(d.id, vb.id, peer_name);
                 this.handleDD(elem.id, remotePeerId);
-                this.handleTS(elem.id, ts.id);
+                this.handleTS(elem.id, ts.id, peer_name);
                 this.handleMV(elem.id, mv.id);
                 this.handleSF(sf.id);
                 this.handleHA(ha.id, d.id);
@@ -3899,33 +3899,34 @@ class RoomClient {
         const videoPlayer = this.getId(videoId);
         const videoBar = this.getId(videoBarId);
         if (videoPlayer && videoBar) {
-            console.log(peer_name);
-
-            if(!peer_name.includes('Surveyor'))
-            {
-                const videoMenuBar = rc.getEcN('videoMenuBar');
-                for (let i = 0; i < videoMenuBar.length; i++) {
-                    const menuBar = videoMenuBar[i];
-                    if (menuBar.id != videoBarId) {
-                        hide(menuBar);
+            videoPlayer.addEventListener('click', () => {
+                console.log(peer_name);
+                if(!peer_name.includes('Surveyor'))
+                {
+                    const videoMenuBar = rc.getEcN('videoMenuBar');
+                    for (let i = 0; i < videoMenuBar.length; i++) {
+                        const menuBar = videoMenuBar[i];
+                        if (menuBar.id != videoBarId) {
+                            show(menuBar);
+                        }
                     }
-                }
 
-                rc.resizeVideoMenuBar();
-                setCamerasBorderNone();
+                    rc.resizeVideoMenuBar();
+                    setCamerasBorderNone();
 
-                if (videoBar.classList.contains('hidden')) {
-                    rc.sound('open');
-                    show(videoBar);
-                    animateCSS(videoBar, 'fadeInDown');
-                    if (participantsCount > 1) videoPlayer.style.border = 'var(--videoBar-active)';
-                } else {
-                    animateCSS(videoBar, 'fadeOutUp').then((msg) => {
-                        hide(videoBar);
-                    });
-                    videoPlayer.style.border = 'none';
+                    // if (videoBar.classList.contains('hidden')) {
+                    //     rc.sound('open');
+                    //     show(videoBar);
+                    //     animateCSS(videoBar, 'fadeInDown');
+                    //     if (participantsCount > 1) videoPlayer.style.border = 'var(--videoBar-active)';
+                    // } else {
+                    //     animateCSS(videoBar, 'fadeOutUp').then((msg) => {
+                    //         hide(videoBar);
+                    //     });
+                    //     videoPlayer.style.border = 'none';
+                    // }
                 }
-            }
+            });
         }
     }
 
@@ -4003,7 +4004,8 @@ class RoomClient {
     // TAKE SNAPSHOT
     // ####################################################
 
-    handleTS(elemId, tsId) {
+    handleTS(elemId, tsId, user_name) {
+        
         let videoPlayer = this.getId(elemId);
         let btnTs = this.getId(tsId);
         var roomName = document.getElementById("roomId").innerHTML;
@@ -4013,6 +4015,7 @@ class RoomClient {
                     return this.userLog('info', 'SnapShoot not allowed if video on privacy mode', 'top-end');
                 }
                 this.sound('snapshot');
+                console.log(user_name, "ini yang ba klik");
                 let context, canvas, width, height, dataURL;
                 width = videoPlayer.videoWidth;
                 height = videoPlayer.videoHeight;
