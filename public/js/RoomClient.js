@@ -3900,19 +3900,24 @@ class RoomClient {
         const videoBar = this.getId(videoBarId);
         if (videoPlayer && videoBar) {
             videoPlayer.addEventListener('click', () => {
-                console.log(peer_name);
+                console.log(peer_name, 'ini namanya');
                 if(!peer_name.includes('Surveyor'))
                 {
-                    const videoMenuBar = rc.getEcN('videoMenuBar');
-                    for (let i = 0; i < videoMenuBar.length; i++) {
-                        const menuBar = videoMenuBar[i];
-                        if (menuBar.id != videoBarId) {
-                            show(menuBar);
-                        }
-                    }
+                    // const videoMenuBar = rc.getEcN('videoMenuBar');
+                    // for (let i = 0; i < videoMenuBar.length; i++) {
+                    //     const menuBar = videoMenuBar[i];
+                    //     if (menuBar.id != videoBarId) {
+                    //         show(menuBar);
+                    //     }
+                    // }
 
                     rc.resizeVideoMenuBar();
                     setCamerasBorderNone();
+
+                    rc.sound('open');
+                    show(videoBar);
+                    animateCSS(videoBar, 'fadeInDown');
+                    if (participantsCount > 1) videoPlayer.style.border = 'var(--videoBar-active)';
 
                     // if (videoBar.classList.contains('hidden')) {
                     //     rc.sound('open');
