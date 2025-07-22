@@ -4030,20 +4030,17 @@ class RoomClient {
                 context = canvas.getContext('2d');
                 context.drawImage(videoPlayer, 0, 0, width, height);
                 dataURL = canvas.toDataURL('image/png');
-                if(!user_name.contains("Surveyor"))
-                {
-                    var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
-                    try {
-                        const response = fetch('/api/v1/uploadToAzure', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ dataURL, fileName: fileName })
-                        });
-                    } catch (error) {
-                        console.error('Error uploading to Azure:', error);
-                    }
+                var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
+                try {
+                    const response = fetch('/api/v1/uploadToAzure', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ dataURL, fileName: fileName })
+                    });
+                } catch (error) {
+                    console.error('Error uploading to Azure:', error);
                 }
                 
                 saveDataToFile(dataURL, fileName);
