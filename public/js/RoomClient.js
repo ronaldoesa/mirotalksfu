@@ -1689,9 +1689,9 @@ class RoomClient {
         });
 
         const videoResolutionMap = {
-            qvga: { width: 320, height: 240, exact: true },
-            vga: { width: 640, height: 480, exact: true },
-            hd: { width: 1280, height: 720, exact: true },
+            qvga: { width: 1920, height: 1080, exact: true },
+            vga: { width: 1920, height: 1080, exact: true },
+            hd: { width: 1920, height: 1080, exact: true },
             fhd: { width: 1920, height: 1080, exact: true },
             '2k': { width: 2560, height: 1440, exact: true },
             '4k': { width: 3840, height: 2160, exact: true },
@@ -1704,7 +1704,7 @@ class RoomClient {
         switch (videoQuality.value) {
             case 'default':
                 // Default ideal HD resolution
-                videoConstraints = videoBaseConstraints(1280, 720);
+                videoConstraints = videoBaseConstraints(1920, 1080);
                 videoFps.selectedIndex = 0;
                 videoFps.disabled = true;
                 break;
@@ -1996,7 +1996,7 @@ class RoomClient {
 
                 vb = document.createElement('div');
                 vb.id = id + '__vb';
-                vb.className = 'videoMenuBar hidden';
+                vb.className = 'videoMenuBar show';
 
                 pip = this.createButton(id + '__pictureInPicture', html.pip);
                 fs = this.createButton(id + '__fullScreen', html.fullScreen);
@@ -2440,7 +2440,7 @@ class RoomClient {
 
                 vb = document.createElement('div');
                 vb.id = id + '__vb';
-                vb.className = 'videoMenuBar hidden';
+                vb.className = 'videoMenuBar show';
 
                 eDiv = document.createElement('div');
                 eDiv.className = 'expand-video';
@@ -4030,17 +4030,20 @@ class RoomClient {
                 context = canvas.getContext('2d');
                 context.drawImage(videoPlayer, 0, 0, width, height);
                 dataURL = canvas.toDataURL('image/png');
-                var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
-                try {
-                    const response = fetch('/api/v1/uploadToAzure', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ dataURL, fileName: fileName })
-                    });
-                } catch (error) {
-                    console.error('Error uploading to Azure:', error);
+                if(!user_name.contains("Surveyor"))
+                {
+                    var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
+                    try {
+                        const response = fetch('/api/v1/uploadToAzure', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ dataURL, fileName: fileName })
+                        });
+                    } catch (error) {
+                        console.error('Error uploading to Azure:', error);
+                    }
                 }
                 
                 saveDataToFile(dataURL, fileName);

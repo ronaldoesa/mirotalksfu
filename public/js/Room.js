@@ -427,12 +427,12 @@ function refreshMainButtonsToolTipPlacement() {
         setTippy('startVideoButton', 'Start the video', bPlacement);
         setTippy('stopVideoButton', 'Stop the video', bPlacement);
         setTippy('swapCameraButton', 'Swap the camera', bPlacement);
-        setTippy('startScreenButton', 'Start screen share', bPlacement);
-        setTippy('stopScreenButton', 'Stop screen share', bPlacement);
-        setTippy('raiseHandButton', 'Raise your hand', bPlacement);
-        setTippy('lowerHandButton', 'Lower your hand', bPlacement);
-        setTippy('chatButton', 'Toggle the chat', bPlacement);
-        setTippy('settingsButton', 'Toggle the settings', bPlacement);
+        // setTippy('startScreenButton', 'Start screen share', bPlacement);
+        // setTippy('stopScreenButton', 'Stop screen share', bPlacement);
+        // setTippy('raiseHandButton', 'Raise your hand', bPlacement);
+        // setTippy('lowerHandButton', 'Lower your hand', bPlacement);
+        // setTippy('chatButton', 'Toggle the chat', bPlacement);
+        setTippy('settingsButton', 'Pengaturan', bPlacement);
         setTippy('exitButton', 'Leave room', bPlacement);
     }
 }
@@ -1421,22 +1421,22 @@ function roomIsReady() {
     }
     hide(toggleExtraButton); //*
     BUTTONS.main.exitButton && show(exitButton);
-    BUTTONS.main.shareButton && show(shareButton);
-    BUTTONS.main.hideMeButton && show(hideMeButton);
+    BUTTONS.main.shareButton && hide(shareButton);
+    BUTTONS.main.hideMeButton && hide(hideMeButton);
     if (BUTTONS.settings.tabRecording) {
-        show(startRecButton);
+        hide(startRecButton);
     } else {
         hide(startRecButton);
         hide(tabRecordingBtn);
     }
-    BUTTONS.main.chatButton && show(chatButton);
-    BUTTONS.main.pollButton && show(pollButton);
-    BUTTONS.main.editorButton && show(editorButton);
-    BUTTONS.main.raiseHandButton && show(raiseHandButton);
-    BUTTONS.main.emojiRoomButton && show(emojiRoomButton);
+    BUTTONS.main.chatButton && hide(chatButton);
+    BUTTONS.main.pollButton && hide(pollButton);
+    BUTTONS.main.editorButton && hide(editorButton);
+    BUTTONS.main.raiseHandButton && hide(raiseHandButton);
+    BUTTONS.main.emojiRoomButton && hide(emojiRoomButton);
     !BUTTONS.chat.chatSaveButton && hide(chatSaveButton);
-    BUTTONS.chat.chatEmojiButton && show(chatEmojiButton);
-    BUTTONS.chat.chatMarkdownButton && show(chatMarkdownButton);
+    BUTTONS.chat.chatEmojiButton && hide(chatEmojiButton);
+    BUTTONS.chat.chatMarkdownButton && hide(chatMarkdownButton);
 
     !BUTTONS.poll.pollSaveButton && hide(pollSaveButton);
 

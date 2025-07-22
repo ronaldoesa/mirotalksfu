@@ -446,7 +446,7 @@ module.exports = {
                 hideMeButton: true,
                 startAudioButton: true,
                 startVideoButton: true,
-                startScreenButton: true,
+                startScreenButton: false,
                 swapCameraButton: true,
                 chatButton: true,
                 pollButton: true,

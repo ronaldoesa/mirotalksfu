@@ -227,49 +227,49 @@ access to use this app.
             </header>
             <main class="mySettingsMain">
                 <div class="tab">
-                    <button id="tabRoomBtn" class="fas fa-home tablinks">
+                    <button id="tabRoomBtn" class="fas fa-home tablinks hidden">
                         <p class="tabButtonText">Room</p>
                     </button>
-                    <button id="tabVideoDevicesBtn" class="fas fa-video tablinks">
+                    <button id="tabVideoDevicesBtn" class="fas fa-video tablinks active">
                         <p class="tabButtonText">Video</p>
                     </button>
-                    <button id="tabAudioDevicesBtn" class="fas fa-microphone tablinks">
+                    <button id="tabAudioDevicesBtn" class="fas fa-microphone tablinks hidden">
                         <p class="tabButtonText">Audio</p>
                     </button>
-                    <button id="tabModeratorBtn" class="fas fa-user-shield tablinks">
+                    <button id="tabModeratorBtn" class="fas fa-user-shield tablinks hidden">
                         <p class="tabButtonText">Moderator</p>
                     </button>
-                    <button id="tabRecordingBtn" class="fas fa-record-vinyl tablinks">
+                    <button id="tabRecordingBtn" class="fas fa-record-vinyl tablinks hidden">
                         <p class="tabButtonText">Recording</p>
                     </button>
-                    <button id="tabVideoAIBtn" class="fab fa-airbnb tablinks">
+                    <button id="tabVideoAIBtn" class="fab fa-airbnb tablinks hidden">
                         <p class="tabButtonText">VideoAI</p>
                     </button>
-                    <button id="tabVideoShareBtn" class="fab fa-youtube tablinks">
+                    <button id="tabVideoShareBtn" class="fab fa-youtube tablinks hidden">
                         <p class="tabButtonText">Media</p>
                     </button>
-                    <button id="tabRTMPStreamingBtn" class="fa-solid fa-satellite-dish tablinks">
+                    <button id="tabRTMPStreamingBtn" class="fa-solid fa-satellite-dish tablinks hidden">
                         <p class="tabButtonText">RTMP</p>
                     </button>
-                    <button id="tabProfileBtn" class="fas fa-user tablinks">
+                    <button id="tabProfileBtn" class="fas fa-user tablinks hidden">
                         <p class="tabButtonText">Profile</p>
                     </button>
-                    <button id="tabShortcutsBtn" class="fas fa-keyboard tablinks">
+                    <button id="tabShortcutsBtn" class="fas fa-keyboard tablinks hidden">
                         <p class="tabButtonText">Shortcuts</p>
                     </button>
-                    <button id="tabAspectBtn" class="fas fa-screwdriver-wrench tablinks">
+                    <button id="tabAspectBtn" class="fas fa-screwdriver-wrench tablinks hidden">
                         <p class="tabButtonText">Aspect</p>
                     </button>
-                    <button id="tabStylingBtn" class="fas fa-palette tablinks">
+                    <button id="tabStylingBtn" class="fas fa-palette tablinks hidden">
                         <p class="tabButtonText">Style</p>
                     </button>
-                    <button id="tabLanguagesBtn" class="fas fa-globe tablinks">
+                    <button id="tabLanguagesBtn" class="fas fa-globe tablinks hidden">
                         <p class="tabButtonText">Language</p>
                     </button>
                 </div>
 
                 <div class="tabActions">
-                    <div id="tabRoom" class="tabcontent">
+                    <div id="tabRoom" class="tabcontent" style="display: none;">
                         <button id="fileShareButton" class="hidden btn-custom">
                             <i class="fas fa-folder-open"></i>
                             <p>File sharing</p>
@@ -389,12 +389,12 @@ access to use this app.
                         </table>
                     </div>
 
-                    <div id="tabVideoDevices" class="tabcontent">
-                        <button id="refreshVideoDevices" class="btn-custom">
+                    <div id="tabVideoDevices" class="tabcontent" style="display: block;">
+                        <button id="refreshVideoDevices" class="btn-custom hidden">
                             <i class="fas fa-rotate"></i>
                             <p>Refresh video devices</p>
                         </button>
-                        <br /><br />
+                        <br class="hidden" /><br class="hidden" />
                         <div class="title">
                             <i class="fas fa-video"></i>
                             <p>Video Source:</p>
@@ -407,14 +407,14 @@ access to use this app.
                         </div>
                         <select id="videoQuality" class="form-select text-light bg-dark">
                             <option value="default">🎥&nbsp;Default</option>
-                            <option value="qvga">🎥&nbsp;QVGA</option>
-                            <option value="vga">🎥&nbsp;VGA</option>
-                            <option value="hd">🎥&nbsp;HD</option>
-                            <option value="fhd">🎥&nbsp;FULL HD</option>
-                            <option value="2k">🎥&nbsp;2k</option>
-                            <option value="4k">🎥&nbsp;4K</option>
+                            <option value="qvga">🎥&nbsp;QVGA - Lowest</option>
+                            <option value="vga">🎥&nbsp;VGA - Low</option>
+                            <option value="hd">🎥&nbsp;HD - Normal</option>
+                            <option value="fhd">🎥&nbsp;FULL HD - High</option>
+                            <option value="2k">🎥&nbsp;2k - Highest</option>
+                            <!-- <option value="4k">🎥&nbsp;4K</option>
                             <option value="6k">🎥&nbsp;6k</option>
-                            <option value="8k">🎥&nbsp;8K</option>
+                            <option value="8k">🎥&nbsp;8K</option> -->
                         </select>
                         <br />
                         <div id="ScreenQualityDiv" class="hidden">
@@ -433,12 +433,12 @@ access to use this app.
                             </select>
                         </div>
                         <hr />
-                        <div class="title">
+                        <div class="title hidden">
                             <i class="fa-solid fa-camera"></i>
                             <p>Camera FPS:</p>
                         </div>
                         <br />
-                        <select id="videoFps" class="form-select text-light bg-dark">
+                        <select id="videoFps" class="form-select text-light bg-dark hidden">
                             <option value="max">max frame-per-second</option>
                             <option value="60">60 - frame-per-second</option>
                             <option value="30">30 - frame-per-second</option>
