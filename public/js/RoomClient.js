@@ -1996,7 +1996,7 @@ class RoomClient {
 
                 vb = document.createElement('div');
                 vb.id = id + '__vb';
-                vb.className = 'videoMenuBar show';
+                vb.className = 'videoMenuBar hidden';
 
                 pip = this.createButton(id + '__pictureInPicture', html.pip);
                 fs = this.createButton(id + '__fullScreen', html.fullScreen);
@@ -2061,7 +2061,7 @@ class RoomClient {
                 this.myVideoEl = elem;
                 this.isVideoPictureInPictureSupported && this.handlePIP(elem.id, pip.id);
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
-                this.handleVB(d.id, vb.id, this.peer_name);
+                this.handleVB(d.id, vb.id, p.innerText);
                 this.handleDD(elem.id, this.peer_id, true);
                 this.handleTS(elem.id, ts.id, this.peer_name);
                 this.handleMV(elem.id, mv.id);
@@ -2440,7 +2440,7 @@ class RoomClient {
 
                 vb = document.createElement('div');
                 vb.id = id + '__vb';
-                vb.className = 'videoMenuBar show';
+                vb.className = 'videoMenuBar hidden';
 
                 eDiv = document.createElement('div');
                 eDiv.className = 'expand-video';
@@ -2545,7 +2545,7 @@ class RoomClient {
 
                 this.isVideoPictureInPictureSupported && this.handlePIP(elem.id, pip.id);
                 this.isVideoFullScreenSupported && this.handleFS(elem.id, fs.id);
-                this.handleVB(d.id, vb.id, peer_name);
+                this.handleVB(d.id, vb.id, p.innerText);
                 this.handleDD(elem.id, remotePeerId);
                 this.handleTS(elem.id, ts.id, peer_name);
                 this.handleMV(elem.id, mv.id);
@@ -2802,7 +2802,7 @@ class RoomClient {
             this.handlePV(this.audioConsumers.get(pv.id) + '___' + pv.id);
         }
 
-        this.handleVB(d.id, vb.id, peer_name);
+        this.handleVB(d.id, vb.id, p.innerText);
         this.handleDD(d.id, peer_id, !remotePeer);
         this.popupPeerInfo(p.id, peer_info);
         this.checkPeerInfoStatus(peer_info);
@@ -3901,7 +3901,7 @@ class RoomClient {
         if (videoPlayer && videoBar) {
             videoPlayer.addEventListener('click', () => {
                 console.log(peer_name, 'ini namanya');
-                if(!peer_name.includes('Surveyor'))
+                if(!peer_name.includes('Surveyor') && !peer_name.includes('(me)'))
                 {
                     // const videoMenuBar = rc.getEcN('videoMenuBar');
                     // for (let i = 0; i < videoMenuBar.length; i++) {
@@ -4020,7 +4020,6 @@ class RoomClient {
                     return this.userLog('info', 'SnapShoot not allowed if video on privacy mode', 'top-end');
                 }
                 this.sound('snapshot');
-                console.log(user_name, "ini yang ba klik");
                 let context, canvas, width, height, dataURL;
                 width = videoPlayer.videoWidth;
                 height = videoPlayer.videoHeight;
@@ -4032,17 +4031,16 @@ class RoomClient {
                 dataURL = canvas.toDataURL('image/png');
                 var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
                 try {
-                    const response = fetch('/api/v1/uploadToAzure', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ dataURL, fileName: fileName })
-                    });
-                } catch (error) {
-                    console.error('Error uploading to Azure:', error);
-                }
-                
+                        const response = fetch('/api/v1/uploadToAzure', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ dataURL, fileName: fileName })
+                        });
+                    } catch (error) {
+                        console.error('Error uploading to Azure:', error);
+                    }
                 saveDataToFile(dataURL, fileName);
             });
         }
