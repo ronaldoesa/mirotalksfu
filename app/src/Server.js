@@ -58,7 +58,8 @@ dev dependencies: {
  * @version 1.7.10
  *
  */
-
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 const express = require('express');
 const { auth, requiresAuth } = require('express-openid-connect');
 const cors = require('cors');
@@ -1050,7 +1051,7 @@ function startServer() {
         });
     });
 
-    app.post([restApi.basePath + '/uploadToAzure'], async (req, res) => {
+    app.post([restApi.basePath + '/uploadToAzureOld'], async (req, res) => {
         const { dataURL, fileName } = req.body;
         try {
             var matches = dataURL.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
@@ -1074,6 +1075,45 @@ function startServer() {
             res.status(500).send('Upload failed');
         }
     });
+
+    app.post(restApi.basePath + '/uploadToAzure',upload.single('file'),async (req, res) => 
+        {
+            try {
+                if (!req.file) {
+                    return res.status(400).send('No file uploaded');
+                }
+
+                console.log(req);
+
+                const snapshotBuffer = req.file.buffer;
+                const contentType = req.file.mimetype;
+                const fileName = req.file.originalname;
+
+                let match = fileName.match(/^MV-\d+-\d+/);
+                const caseName = match ? match[0] : null;
+
+                const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+                const containerClient = blobServiceClient.getContainerClient(containerName);
+                await containerClient.createIfNotExists();
+
+                const blobPath = `${env}/${folderName}/${caseName}/${fileName}`;
+                const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
+
+                await blockBlobClient.uploadData(snapshotBuffer, {
+                    blobHTTPHeaders: {
+                        blobContentType: contentType,
+                    },
+                });
+
+                console.log(`Uploaded: ${fileName}`);
+                res.json({ success: true });
+
+            } catch (error) {
+                console.error('Azure upload failed:', error);
+                res.status(500).send('Upload failed');
+            }
+        }
+    );
 
     // request join room endpoint
     app.post([restApi.basePath + '/join'], (req, res) => {

@@ -1407,6 +1407,8 @@ function joinRoom(peer_name, room_id) {
             transcription,
             roomIsReady,
         );
+        window.roomClient = rc;
+
         handleRoomClientEvents();
         //notify ? shareRoom() : sound('joined');
     }

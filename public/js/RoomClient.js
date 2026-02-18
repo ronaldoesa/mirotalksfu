@@ -973,6 +973,121 @@ class RoomClient {
         }
     };
 
+    formatSnapshotDate(date = new Date()) {
+        const days = [
+            'Sunday', 'Monday', 'Tuesday',
+            'Wednesday', 'Thursday', 'Friday', 'Saturday'
+        ];
+
+        const months = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        const dayName = days[date.getDay()];
+        const day = date.getDate();
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+
+        let hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+
+        hours = hours % 12 || 12;
+
+        return `${dayName}, ${day} ${month} ${year} ${hours}:${minutes} ${ampm}`;
+    }
+
+    captureLocalEvidence() {
+        // 🔐 Rate limit (local enforcement)
+        const now = Date.now();
+        if (this.lastSnapshotTs && now - this.lastSnapshotTs < 3000) {
+            console.warn('Please wait to snap another!');
+            return;
+        }
+        this.lastSnapshotTs = now;
+
+        // 🎥 Find local camera video (muted or unmuted)
+        const video = [...document.querySelectorAll('video')].find(v => {
+            const stream = v.srcObject;
+            if (!stream) return false;
+            if (!stream.getVideoTracks().length) return false;
+            return v.videoWidth > 0 && v.videoHeight > 0;
+        });
+
+        if (!video) {
+            console.warn('No local camera video found');
+            return;
+        }
+
+        if (video.readyState < 2) {
+            console.warn('Video not ready');
+            return;
+        }
+
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, w, h);
+
+        // 🟡 WATERMARK START
+        const timestamp = this.formatSnapshotDate();
+
+        ctx.font = '28px Arial';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.textAlign = 'right';
+
+        ctx.strokeText(timestamp, w - 20, h - 30);
+        ctx.fillText(timestamp, w - 20, h - 30);
+
+        ctx.textAlign = 'left';
+        // 🟡 WATERMARK END
+        // 📸 Export
+        canvas.toBlob(
+            async (blob) => {
+                if (!blob) {
+            console.error('Failed to create blob');
+            return;
+        }
+
+        const roomName = this.room_id;
+        const fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
+
+        // 📦 Create multipart form
+        const formData = new FormData();
+        formData.append('file', blob, fileName);
+
+        try {
+            const response = await fetch('/api/v1/uploadToAzure', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                console.error('Upload failed');
+            } else {
+                console.log('📸 Snapshot uploaded successfully');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+        }
+
+        // Optional: local download for testing
+        saveDataToFile(URL.createObjectURL(blob), fileName);
+
+        console.log('📸 Snapshot captured:', blob);
+            },
+            'image/png'
+        );
+    }
+
     handleNewProducers = async (data) => {
         if (data.length > 0) {
             console.log('SocketOn New producers', data);
@@ -1006,9 +1121,17 @@ class RoomClient {
         console.log('SocketOn Peer cmd:', data);
         this.handleCmd(data);
     };
-
+    
     handlePeerAction = (data) => {
         console.log('SocketOn Peer action:', data);
+
+        // 📸 SNAPSHOT HANDLER (A side)
+        if (data.action === 'snapshot') {
+            console.log('📸 Remote snapshot requested');
+            this.captureLocalEvidence();
+            return; // ⛔ prevent normal peerAction flow
+        }
+
         this.peerAction(data.from_peer_name, data.peer_id, data.action, false, data.broadcast, true, data.message);
     };
 
@@ -4012,39 +4135,43 @@ class RoomClient {
     handleTS(elemId, tsId, user_name) {
         
         let videoPlayer = this.getId(elemId);
+        
+        console.log(elemId, 'ini elemID');
+
         let btnTs = this.getId(tsId);
         var roomName = document.getElementById("roomId").innerHTML;
         if (btnTs && videoPlayer) {
             btnTs.addEventListener('click', () => {
                 if (videoPlayer.classList.contains('videoCircle')) {
-                    return this.userLog('info', 'SnapShoot not allowed if video on privacy mode', 'top-end');
+                    return this.userLog(
+                        'info',
+                        'Snapshot not allowed if video on privacy mode',
+                        'top-end'
+                    );
                 }
+
                 this.sound('snapshot');
-                let context, canvas, width, height, dataURL;
-                width = videoPlayer.videoWidth;
-                height = videoPlayer.videoHeight;
-                canvas = canvas || document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                context = canvas.getContext('2d');
-                context.drawImage(videoPlayer, 0, 0, width, height);
-                dataURL = canvas.toDataURL('image/png');
-                var fileName = roomName + '-' + getDataTimeString() + '-SNAPSHOT.png';
-                try {
-                        const response = fetch('/api/v1/uploadToAzure', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ dataURL, fileName: fileName })
-                        });
-                    } catch (error) {
-                        console.error('Error uploading to Azure:', error);
-                    }
-                saveDataToFile(dataURL, fileName);
+
+                // 🔥 THIS IS THE IMPORTANT LINE
+                const realSocketId = videoPlayer.getAttribute('name');
+
+                console.log('Sending snapshot to socket id:', realSocketId);
+
+                this.socket.emit('peerAction', {
+                    action: 'snapshot',
+                    peer_id: realSocketId,
+                    from_peer_name: this.peer_name
+                });
+
+                this.userLog(
+                    'info',
+                    `Snapshot requested from ${user_name}`,
+                    'top-end'
+                );
             });
         }
     }
+    
 
     // ####################################################
     // HANDLE VIDEO MIRROR
@@ -8200,6 +8327,12 @@ class RoomClient {
                             this.peerActionProgress(action, 'In progress, wait...', 2000, 'refresh');
                     });
                 break;
+            case 'snapshot':
+                this.socket.emit('peerAction', {
+                    action: 'snapshot',
+                    peer_id: data.peer_id
+                });
+                break;  
             default:
                 break;
             //...
