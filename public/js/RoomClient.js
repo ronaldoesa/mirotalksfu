@@ -1007,21 +1007,24 @@ class RoomClient {
         }
         this.lastSnapshotTs = now;
 
-        // 🎥 Find local camera video (muted or unmuted)
-        const video = [...document.querySelectorAll('video')].find(v => {
-            const stream = v.srcObject;
-            if (!stream) return false;
-            if (!stream.getVideoTracks().length) return false;
-            return v.videoWidth > 0 && v.videoHeight > 0;
-        });
+        // 🎯 STEP 1: Get MY socket id
+        const mySocketId = this.socket.id;
+
+        // 🎯 STEP 2: Select ONLY my own video element
+        const video = document.querySelector(`video[name="${mySocketId}"]`);
 
         if (!video) {
-            console.warn('No local camera video found');
+            console.warn('Local video element not found for socket:', mySocketId);
             return;
         }
 
-        if (video.readyState < 2) {
-            console.warn('Video not ready');
+        if (!video.srcObject || !video.srcObject.getVideoTracks().length) {
+            console.warn('Local video has no active stream');
+            return;
+        }
+
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            console.warn('Video not ready yet');
             return;
         }
 
