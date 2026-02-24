@@ -1082,9 +1082,6 @@ function startServer() {
                 if (!req.file) {
                     return res.status(400).send('No file uploaded');
                 }
-
-                console.log(req);
-
                 const snapshotBuffer = req.file.buffer;
                 const contentType = req.file.mimetype;
                 const fileName = req.file.originalname;
@@ -1098,7 +1095,7 @@ function startServer() {
 
                 const blobPath = `${env}/${folderName}/${caseName}/${fileName}`;
                 const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
-
+		console.log(blobPath);
                 await blockBlobClient.uploadData(snapshotBuffer, {
                     blobHTTPHeaders: {
                         blobContentType: contentType,

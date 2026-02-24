@@ -1,6 +1,8 @@
 'use strict';
 
 const os = require('os');
+const rtcMinPort = 40000;
+const rtcMaxPort = 40100;
 
 // https://api.ipify.org
 
@@ -27,7 +29,7 @@ IPv4 Configuration Guide:
         This ensures the public IP remains consistent across instance reboots.
     Note: Always enclose the IP address in single quotes ''.
 */
-const IPv4 = getIPv4(); // Replace with the appropriate IPv4 address for your environment.
+const IPv4 = '16.78.46.189'; // Replace with the appropriate IPv4 address for your environment.
 
 const numWorkers = require('os').cpus().length;
 
@@ -287,14 +289,14 @@ module.exports = {
         connectionString: "DefaultEndpointsProtocol=https;AccountName=tobstorage;AccountKey=uDHWnkucu+QXHxVb1+HsdjKu9aNobKloV1sLU+jObCiIcuTLFMwTNCzLuXns6vRdO1vvxzPyg0/hE9wrBC622Q==;EndpointSuffix=core.windows.net",
         containerName: "tobclaimreport",
         folderName: "livesurvey",
-        env: "UAT",
-        //env: "LIVE",
+        //env: "UAT",
+        env: "LIVE",
     },
     sentry: {
         /*
         Sentry
             1. Goto https://sentry.io/
-            2. Create account
+	    2. Create account
             3. On dashboard goto Settings/Projects/YourProjectName/Client Keys (DSN)
         */
         enabled: false,
@@ -632,20 +634,10 @@ module.exports = {
         // WebRtcTransportOptions
         webRtcTransport: {
             listenInfos: [
-                // { protocol: 'udp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
-                // { protocol: 'tcp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
-                {
-                    protocol: 'udp',
-                    ip: '0.0.0.0',
-                    announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40100 },
-                },
-                {
-                    protocol: 'tcp',
-                    ip: '0.0.0.0',
-                    announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40100 },
-                },
+                 //{ protocol: 'udp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
+                 //{ protocol: 'tcp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
+                 { protocol: 'udp', ip: '0.0.0.0', announcedAddress: IPv4, portRange: { min: 40000, max: 40100 }},
+		 { protocol: 'tcp', ip: '0.0.0.0', announcedAddress: IPv4, portRange: { min: 40000, max: 40100 }},
             ],
             initialAvailableOutgoingBitrate: 1000000,
             minimumAvailableOutgoingBitrate: 600000,
@@ -653,4 +645,5 @@ module.exports = {
             maxIncomingBitrate: 1500000,
         },
     },
-};
+}
+

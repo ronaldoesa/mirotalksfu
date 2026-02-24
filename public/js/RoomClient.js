@@ -1076,6 +1076,7 @@ class RoomClient {
                 console.log('📸 Snapshot uploaded successfully');
             }
         } catch (error) {
+            alert('Upload error: ' + error.message);
             console.error('Upload error:', error);
         }
 
