@@ -60,29 +60,7 @@ body {
 # Loading...
 --------------------------------------------------------------*/
 
-#loadingDiv {
-    color: #fff;
-    padding: 30px;
-    text-align: center;
-    border-radius: 10px;
-    background: rgba(0, 0, 0, 0.7);
-}
-#loadingDiv h1 {
-    padding: 10px;
-    font-size: 60px;
-    font-family: 'Montserrat';
-    border-radius: 10px;
-}
-#loadingDiv img {
-    margin-top: 5px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-}
-#loadingDiv pre {
-    padding: 10px;
-    font-family: 'Montserrat';
-    border-radius: 10px;
-}
+/* #loadingDiv is styled by TobSurvey.css (.tob-loading) */
 
 /*--------------------------------------------------------------
 # Init User

@@ -518,8 +518,13 @@ async function initRoom() {
 
 async function initEnumerateDevices() {
     console.log('01 ----> init Enumerate Devices');
+    if (!(await tobPermissionsGranted())) tobShowPermission();
     await initEnumerateVideoDevices();
     await initEnumerateAudioDevices();
+    if (!isVideoAllowed && !isAudioAllowed && (await tobPermissionDenied()) === 'retry') {
+        return initEnumerateDevices();
+    }
+    tobShowLoading();
     await initRoom();
 }
 
@@ -698,6 +703,7 @@ function setupInitButtons() {
     initVideoMirrorButton.onclick = () => {
         initVideo.classList.toggle('mirror');
         isInitVideoMirror = initVideo.classList.contains('mirror');
+        tobSyncPrejoin();
     };
     initUsernameEmojiButton.onclick = () => {
         getId('usernameInput').value = '';
@@ -1099,37 +1105,28 @@ async function whoAreYou() {
         console.error('AXIOS OIDC Error fetching profile', error.message || error);
     }
 
-    initUser.classList.toggle('hidden');
+    if (force_peer_name) hide(initUsernameEmojiButton);
 
-    Swal.fire({
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        background: swalBackground,
-        title: BRAND.app.name,
-        input: 'text',
-        inputPlaceholder: 'Enter your name',
-        inputAttributes: { maxlength: 32, id: 'usernameInput' },
-        inputValue: default_name,
-        html: initUser, // Inject HTML
-        confirmButtonText: `Join meeting`,
-        customClass: { popup: 'init-modal-size' },
-        showClass: { popup: 'animate__animated animate__fadeInDown' },
-        hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        willOpen: () => {
-            hide(loadingDiv);
-        },
-        inputValidator: (name) => {
-            if (!name) return 'Please enter your email or name';
-            if (name.length > 30) return 'Name must be max 30 char';
-            name = filterXSS(name);
-            if (isHtml(name)) return 'Invalid name!';
-            if (!getCookie(room_id + '_name')) {
-                window.localStorage.peer_name = name;
-            }
-            setCookie(room_id + '_name', name, 30);
-            peer_name = name;
-        },
-    }).then(async () => {
+    if (!isVideoAllowed) {
+        elemDisplay('initVideo', false);
+        initVideoContainerShow(false);
+        hide(initVideoSelect);
+    }
+    if (!isAudioAllowed) {
+        hide(initMicrophoneSelect);
+        hide(initSpeakerSelect);
+    }
+
+    hide(loadingDiv);
+
+    // TOB pre-join screen (TobFlow.js) replaces the old SweetAlert name prompt
+    tobAskName(default_name, force_peer_name).then(async (name) => {
+        if (!getCookie(room_id + '_name')) {
+            window.localStorage.peer_name = name;
+        }
+        setCookie(room_id + '_name', name, 30);
+        peer_name = name;
+
         if (!usernameEmoji.classList.contains('hidden')) {
             usernameEmoji.classList.add('hidden');
         }
@@ -1141,39 +1138,22 @@ async function whoAreYou() {
         getPeerInfo();
         joinRoom(peer_name, room_id);
     });
-
-    if (force_peer_name) {
-        getId('usernameInput').disabled = true;
-        hide(initUsernameEmojiButton);
-    }
-
-    if (!isVideoAllowed) {
-        elemDisplay('initVideo', false);
-        initVideoContainerShow(false);
-        hide(initVideoSelect);
-    }
-    if (!isAudioAllowed) {
-        hide(initMicrophoneSelect);
-        hide(initSpeakerSelect);
-    }
 }
 
 function handleAudio() {
     isAudioAllowed = isAudioAllowed ? false : true;
-    initAudioButton.className = 'fas fa-microphone' + (isAudioAllowed ? '' : '-slash');
-    setColor(initAudioButton, isAudioAllowed ? 'white' : 'red');
     setColor(startAudioButton, isAudioAllowed ? 'white' : 'red');
     checkInitAudio(isAudioAllowed);
     lS.setInitConfig(lS.MEDIA_TYPE.audio, isAudioAllowed);
+    tobSyncPrejoin();
 }
 
 function handleVideo() {
     isVideoAllowed = isVideoAllowed ? false : true;
-    initVideoButton.className = 'fas fa-video' + (isVideoAllowed ? '' : '-slash');
-    setColor(initVideoButton, isVideoAllowed ? 'white' : 'red');
     setColor(startVideoButton, isVideoAllowed ? 'white' : 'red');
     checkInitVideo(isVideoAllowed);
     lS.setInitConfig(lS.MEDIA_TYPE.video, isVideoAllowed);
+    tobSyncPrejoin();
 }
 
 async function handleAudioVideo() {
@@ -1183,22 +1163,17 @@ async function handleAudioVideo() {
     lS.setInitConfig(lS.MEDIA_TYPE.audio, isAudioVideoAllowed);
     lS.setInitConfig(lS.MEDIA_TYPE.video, isAudioVideoAllowed);
     lS.setInitConfig(lS.MEDIA_TYPE.audioVideo, isAudioVideoAllowed);
-    initAudioButton.className = 'fas fa-microphone' + (isAudioVideoAllowed ? '' : '-slash');
-    initVideoButton.className = 'fas fa-video' + (isAudioVideoAllowed ? '' : '-slash');
-    initAudioVideoButton.className = 'fas fa-eye' + (isAudioVideoAllowed ? '' : '-slash');
     if (!isAudioVideoAllowed) {
         hide(initAudioButton);
         hide(initVideoButton);
         hide(initVideoAudioRefreshButton);
     }
     if (isAudioAllowed && isVideoAllowed && !isMobileDevice) show(initVideoAudioRefreshButton);
-    setColor(initAudioVideoButton, isAudioVideoAllowed ? 'white' : 'red');
-    setColor(initAudioButton, isAudioAllowed ? 'white' : 'red');
-    setColor(initVideoButton, isVideoAllowed ? 'white' : 'red');
     setColor(startAudioButton, isAudioAllowed ? 'white' : 'red');
     setColor(startVideoButton, isVideoAllowed ? 'white' : 'red');
     await checkInitVideo(isVideoAllowed);
     checkInitAudio(isAudioAllowed);
+    tobSyncPrejoin();
 }
 
 async function checkInitVideo(isVideoAllowed) {
@@ -2303,6 +2278,7 @@ async function changeCamera(deviceId) {
             );
             checkInitConfig();
             handleCameraMirror(initVideo);
+            tobSyncPrejoin();
         })
         .catch((error) => {
             console.error('[Error] changeCamera', error);
@@ -2420,10 +2396,12 @@ async function toggleScreenSharing() {
                 disable(initVideoButton, true);
                 disable(initAudioVideoButton, true);
                 disable(initVideoAudioRefreshButton, true);
+                tobSyncPrejoin();
             })
             .catch((error) => {
                 console.error('[Error] toggleScreenSharing', error);
                 joinRoomWithScreen = false;
+                tobSyncPrejoin();
                 return checkInitVideo(isVideoAllowed);
             });
     } else {
@@ -2434,6 +2412,7 @@ async function toggleScreenSharing() {
         disable(initVideoButton, false);
         disable(initAudioVideoButton, false);
         disable(initVideoAudioRefreshButton, false);
+        tobSyncPrejoin();
     }
 }
 

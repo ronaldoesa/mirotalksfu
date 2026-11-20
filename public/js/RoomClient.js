@@ -480,6 +480,7 @@ class RoomClient {
 
     async joinAllowed(room) {
         console.log('07 ----> Join Room allowed');
+        tobHide();
         await this.handleRoomInfo(room);
         const routerRtpCapabilities = await this.socket.request('getRouterRtpCapabilities');
         routerRtpCapabilities.headerExtensions = routerRtpCapabilities.headerExtensions.filter(
@@ -633,15 +634,11 @@ class RoomClient {
 
         console.log('07.2 Participants Count ---->', participantsCount);
 
-        // notify && participantsCount == 1 ? shareRoom() : sound('joined');
-        if (notify && participantsCount == 1) {
-            shareRoom();
-        } else {
-            if (this.isScreenAllowed) {
-                this.shareScreen();
-            }
-            sound('joined');
+        // TOB: no "Share the room" QR popup on first join
+        if (this.isScreenAllowed) {
+            this.shareScreen();
         }
+        sound('joined');
     }
 
     async loadDevice(routerRtpCapabilities) {
@@ -7369,74 +7366,32 @@ class RoomClient {
             };
             this.socket.emit('roomAction', data);
         } else {
-            Swal.fire({
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                background: swalBackground,
-                imageUrl: image.locked,
-                title: 'Oops, Room is Locked',
-                input: 'text',
-                inputPlaceholder: 'Enter the Room password',
-                confirmButtonText: `OK`,
-                showClass: { popup: 'animate__animated animate__fadeInDown' },
-                hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-                inputValidator: (pwd) => {
-                    if (!pwd) return 'Please enter the Room password';
-                    this.RoomPassword = pwd;
-                },
-            }).then(() => {
-                let data = {
-                    action: 'checkPassword',
-                    password: this.RoomPassword,
-                };
-                this.socket.emit('roomAction', data);
-            });
+            this.askRoomPassword();
         }
+    }
+
+    // TOB password screen (TobFlow.js); a wrong password re-opens it with an error
+    askRoomPassword(errorText = '') {
+        tobAskPassword(errorText, () => this.exit()).then((pwd) => {
+            this.RoomPassword = pwd;
+            let data = {
+                action: 'checkPassword',
+                password: this.RoomPassword,
+            };
+            this.socket.emit('roomAction', data);
+        });
     }
 
     roomIsLocked() {
         this.sound('eject');
         this.event(_EVENTS.roomLock);
-        console.log('Room is Locked, try with another one');
-        Swal.fire({
-            allowOutsideClick: false,
-            background: swalBackground,
-            position: 'center',
-            imageUrl: image.locked,
-            title: 'Oops, Wrong Room Password',
-            text: 'The room is locked, try with another one.',
-            showDenyButton: false,
-            confirmButtonText: `Ok`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed) this.exit();
-        });
+        console.log('Room is Locked, wrong password');
+        this.askRoomPassword('Kata sandi salah. Coba lagi.');
     }
 
     waitJoinConfirm() {
         this.sound('lobby');
-        Swal.fire({
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            showDenyButton: true,
-            showConfirmButton: false,
-            background: swalBackground,
-            imageUrl: image.poster,
-            title: 'Room has lobby enabled',
-            text: 'Asking to join meeting...',
-            confirmButtonText: `Ok`,
-            denyButtonText: `Leave room`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
-        }).then((result) => {
-            if (result.isConfirmed) {
-                control.style.display = 'none';
-                bottomButtons.style.display = 'none';
-            } else {
-                this.exit();
-            }
-        });
+        tobShowLobby(() => this.exit());
     }
 
     isBanned() {

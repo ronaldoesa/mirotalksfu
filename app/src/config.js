@@ -404,29 +404,27 @@ module.exports = {
         */
         brand: {
             app: {
-                name: 'MiroTalk SFU',
-                title: 'MiroTalk SFU<br />Free browser based Real-time video calls.<br />Simple, Secure, Fast.',
+                name: 'TOB Live Survey',
+                title: 'Survei langsung, cukup dari browser Anda.',
                 description:
-                    'Start your next video call with a single click. No download, plug-in, or login is required. Just get straight to talking, messaging, and sharing your screen.',
+                    'Pilih nama ruangan, bagikan tautannya, dan mulai survei video. Tanpa unduhan, plugin, atau login.',
             },
             site: {
-                title: 'MiroTalk SFU, Free Video Calls, Messaging and Screen Sharing',
-                icon: '../images/logo.svg',
-                appleTouchIcon: '../images/logo.svg',
+                title: 'TOB Live Survey',
+                icon: '../images/tob/brand-mark.svg',
+                appleTouchIcon: '../images/tob/brand-mark.svg',
             },
             meta: {
-                description:
-                    'MiroTalk SFU powered by WebRTC and mediasoup, Real-time Simple Secure Fast video calls, messaging and screen sharing capabilities in the browser.',
-                keywords:
-                    'webrtc, miro, mediasoup, mediasoup-client, self hosted, voip, sip, real-time communications, chat, messaging, meet, webrtc stun, webrtc turn, webrtc p2p, webrtc sfu, video meeting, video chat, video conference, multi video chat, multi video conference, peer to peer, p2p, sfu, rtc, alternative to, zoom, microsoft teams, google meet, jitsi, meeting',
+                description: 'TOB Live Survey - survei video langsung tob insurance, cukup dari browser Anda.',
+                keywords: 'tob insurance, live survey, survei video, klaim',
             },
             og: {
                 type: 'app-webrtc',
-                siteName: 'MiroTalk SFU',
-                title: 'Click the link to make a call.',
-                description: 'MiroTalk SFU calling provides real-time video calls, messaging and screen sharing.',
-                image: 'https://sfu.mirotalk.com/images/mirotalksfu.png',
-                url: 'https://sfu.mirotalk.com',
+                siteName: 'TOB Live Survey',
+                title: 'Klik tautan untuk bergabung ke survei.',
+                description: 'Survei video langsung tob insurance.',
+                image: '',
+                url: '',
             },
             html: {
                 features: true,

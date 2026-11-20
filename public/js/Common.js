@@ -175,7 +175,7 @@ const lastRoomContainer = document.getElementById('lastRoomContainer');
 const lastRoom = document.getElementById('lastRoom');
 const lastRoomName = window.localStorage.lastRoom ? window.localStorage.lastRoom : '';
 if (lastRoomContainer && lastRoom && lastRoomName) {
-    lastRoomContainer.style.display = 'inline-flex';
+    lastRoomContainer.style.display = 'flex';
     lastRoom.setAttribute('href', '/join/?room=' + lastRoomName);
     lastRoom.innerText = lastRoomName;
 }
@@ -203,6 +203,8 @@ if (adultCnt) {
 }
 
 document.getElementById('roomName').onkeyup = (e) => {
+    const roomError = document.getElementById('roomError');
+    if (roomError) roomError.classList.add('hidden');
     if (e.keyCode === 13) {
         e.preventDefault();
         joinRoom();
@@ -224,17 +226,24 @@ function joinRoom() {
     const roomValid = isValidRoomName(roomName);
 
     if (!roomName) {
-        popup('warning', 'Room name empty!\nPlease pick a room name.');
+        showRoomError('Isi nama ruangan terlebih dahulu.');
         return;
     }
     if (!roomValid) {
-        popup('warning', 'Invalid Room name!\nPath traversal pattern detected!');
+        showRoomError('Nama ruangan tidak valid.');
         return;
     }
 
     //window.location.href = '/join/' + roomName;
     window.location.href = '/join/?room=' + roomName;
     window.localStorage.lastRoom = roomName;
+}
+
+function showRoomError(text) {
+    const roomError = document.getElementById('roomError');
+    if (!roomError) return popup('warning', text);
+    roomError.innerText = text;
+    roomError.classList.remove('hidden');
 }
 
 function isValidRoomName(input) {

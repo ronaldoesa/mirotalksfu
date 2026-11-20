@@ -46,6 +46,15 @@
         <link rel="stylesheet" href="../css/GroupChat.css" />
         <link rel="stylesheet" href="../css/Polls.css" />
         <link rel="stylesheet" href="../css/Editor.css" />
+        <link rel="stylesheet" href="../css/TobSurvey.css" />
+
+        <!-- TOB Live Survey fonts -->
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+        />
 
         <!-- https://cdnjs.com/libraries/font-awesome -->
 
@@ -124,6 +133,7 @@
         <script defer src="../js/Transcription.js"></script>
         <script defer src="../js/VideoGrid.js"></script>
         <script defer src="../js/RoomClient.js"></script>
+        <script defer src="../js/TobFlow.js"></script>
         <script defer src="../js/Room.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
@@ -143,41 +153,408 @@
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
 
-        <div id="loadingDiv" class="center pulsate">
-            <h1>Loading</h1>
-            <img class="loading-img" src="../images/loading.gif" />
-            <pre>
-Please allow the camera or microphone
-access to use this app.
-            </pre>
+        <!-- TOB Live Survey join flow: permission, pre-join, password and lobby (see TobFlow.js) -->
+        <div id="tobFlow" class="tob tob-flow">
+            <header class="tob-header">
+                <a class="tob-brand" href="/">
+                    <img src="../images/tob/brand-mark.svg" alt="tob" width="36" height="36" />
+                    <div class="tob-brand-text">
+                        <span class="tob-brand-title">TOB Live Survey</span>
+                        <span class="tob-brand-sub">tob insurance</span>
+                    </div>
+                </a>
+                <div class="tob-spacer"></div>
+                <div id="tobHeaderActions" class="tob-header-actions hidden">
+                    <div class="tob-chip">
+                        <span class="tob-overline tob-chip-label">Ruangan</span>
+                        <span id="tobRoomName" class="tob-chip-value"></span>
+                    </div>
+                    <button id="tobCopyLink" class="tob-btn" type="button">
+                        <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="9" y="9" width="12" height="12" rx="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        <span id="tobCopyLabel" class="tob-copy-text">Salin tautan</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="tob-main">
+                <div id="tobSteps" class="tob-steps"></div>
+
+                <!-- Loading (until the room config and devices are ready) -->
+                <div id="loadingDiv" class="tob-loading">
+                    <span class="tob-spinner"></span>
+                    <span>Menyiapkan ruangan...</span>
+                </div>
+
+                <!-- Camera / microphone permission -->
+                <div id="tobPermission" class="tob-center hidden">
+                    <div class="tob-card tob-card-elevated tob-dialog tob-perm">
+                        <img id="tobPermAskingImg" src="../images/tob/tobi-ngintip.png" alt="Tobi" />
+                        <img id="tobPermDeniedImg" class="hidden" src="../images/tob/tobi-bingung.png" alt="Tobi" />
+                        <div class="tob-perm-head">
+                            <span id="tobPermPill" class="tob-pill"><span class="tob-dot"></span>Menunggu izin</span>
+                            <h2 id="tobPermTitle" class="tob-h2">Izinkan akses kamera dan mikrofon</h2>
+                            <p id="tobPermBody" class="tob-text-muted">
+                                Pilih "Izinkan" pada pop-up browser agar surveyor dapat melihat dan mendengar Anda.
+                            </p>
+                        </div>
+                        <div class="tob-perm-devices">
+                            <div class="tob-perm-device">
+                                <div class="tob-perm-icon">
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path>
+                                        <rect x="2" y="6" width="14" height="12" rx="2"></rect>
+                                    </svg>
+                                </div>
+                                <div class="tob-perm-device-text">
+                                    <strong>Kamera</strong>
+                                    <span class="tob-perm-status">Menunggu izin</span>
+                                </div>
+                            </div>
+                            <div class="tob-perm-device">
+                                <div class="tob-perm-icon">
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"></path>
+                                    </svg>
+                                </div>
+                                <div class="tob-perm-device-text">
+                                    <strong>Mikrofon</strong>
+                                    <span class="tob-perm-status">Menunggu izin</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="tobPermDeniedActions" class="tob-perm-denied hidden">
+                            <div class="tob-perm-hint">
+                                Klik ikon gembok di bilah alamat browser, ubah Kamera dan Mikrofon ke
+                                <strong>Izinkan</strong>, lalu coba lagi.
+                            </div>
+                            <div class="tob-actions tob-actions-center">
+                                <button id="tobPermSkip" class="tob-btn" type="button">Lanjut tanpa kamera</button>
+                                <button id="tobPermRetry" class="tob-btn tob-btn-blue" type="button">Coba lagi</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 03 Pre-join -->
+                <div id="initUser" class="tob-prejoin hidden">
+                    <div class="tob-prejoin-left">
+                        <div class="tob-stage">
+                            <div class="tob-stage-fallback">
+                                <div class="tob-avatar tob-initials">TB</div>
+                                <span id="tobCamFallbackText">Menyiapkan kamera</span>
+                            </div>
+                            <div id="initVideoContainer" class="init-video-container">
+                                <video id="initVideo" playsinline="true" autoplay="" muted class="mirror"></video>
+                            </div>
+                            <div class="tob-badges">
+                                <span class="tob-badge"><span class="tob-dot"></span>Pratinjau</span>
+                                <span id="tobShareBadge" class="tob-badge tob-badge-blue hidden">Membagikan layar</span>
+                            </div>
+                            <div class="tob-namebar">
+                                <i id="tobNamebarMicOff" class="fas fa-microphone-slash hidden"></i>
+                                <span class="tob-display-name">Anda</span>
+                            </div>
+                        </div>
+
+                        <div class="tob-card tob-toolbar">
+                            <button id="initVideoButton" class="tob-tool" type="button">
+                                <i class="fas fa-video"></i><span class="tob-tool-label">Kamera</span>
+                            </button>
+                            <button id="initAudioButton" class="tob-tool" type="button">
+                                <i class="fas fa-microphone"></i><span class="tob-tool-label">Mikrofon</span>
+                            </button>
+                            <button id="initAudioVideoButton" class="tob-tool tob-tool-icon" type="button">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button id="initVideoMirrorButton" class="tob-tool is-active" type="button">
+                                <i class="fas fa-arrow-right-arrow-left"></i><span class="tob-tool-label">Cermin</span>
+                            </button>
+                            <button id="initStartScreenButton" class="tob-tool hidden" type="button">
+                                <i class="fas fa-desktop"></i><span class="tob-tool-label">Bagikan layar</span>
+                            </button>
+                            <button id="initStopScreenButton" class="tob-tool is-active hidden" type="button">
+                                <i class="fas fa-desktop"></i><span class="tob-tool-label">Hentikan berbagi</span>
+                            </button>
+                            <div class="tob-spacer"></div>
+                            <button
+                                id="initVideoAudioRefreshButton"
+                                class="tob-tool tob-tool-icon"
+                                type="button"
+                                title="Muat ulang perangkat"
+                            >
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tob-card tob-prejoin-side">
+                        <div class="tob-side-head">
+                            <div class="tob-side-title">Siap bergabung?</div>
+                            <div class="tob-side-sub">Periksa kamera dan mikrofon sebelum masuk.</div>
+                        </div>
+                        <div class="tob-side-body">
+                            <div class="tob-field">
+                                <label for="usernameInput" class="tob-label">Nama Anda</label>
+                                <div class="tob-name-row">
+                                    <input
+                                        id="usernameInput"
+                                        class="tob-input tob-input-sm"
+                                        type="text"
+                                        maxlength="32"
+                                        placeholder="Masukkan nama Anda"
+                                        autocomplete="name"
+                                    />
+                                    <button id="initUsernameEmojiButton" class="tob-tool tob-tool-icon" type="button">
+                                        <i class="fas fa-smile"></i>
+                                    </button>
+                                </div>
+                                <span id="usernameError" class="tob-error hidden"></span>
+                            </div>
+
+                            <div class="tob-field" data-select="initVideoSelect">
+                                <label for="initVideoSelect" class="tob-label">Kamera</label>
+                                <div class="tob-select-wrap">
+                                    <select id="initVideoSelect"></select>
+                                    <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="#6B7280"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="m6 9 6 6 6-6"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="tob-field" data-select="initMicrophoneSelect">
+                                <label for="initMicrophoneSelect" class="tob-label">Mikrofon</label>
+                                <div class="tob-select-wrap">
+                                    <select id="initMicrophoneSelect"></select>
+                                    <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="#6B7280"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="m6 9 6 6 6-6"></path>
+                                    </svg>
+                                </div>
+                                <div class="tob-meter-row">
+                                    <div id="tobMicMeter" class="tob-meter">
+                                        <span></span><span></span><span></span><span></span><span></span><span></span
+                                        ><span></span><span></span><span></span><span></span><span></span><span></span
+                                        ><span></span><span></span><span></span><span></span>
+                                    </div>
+                                    <span class="tob-meter-label">Level</span>
+                                </div>
+                            </div>
+                            <div class="tob-field" data-select="initSpeakerSelect">
+                                <label for="initSpeakerSelect" class="tob-label">Speaker</label>
+                                <div class="tob-select-wrap">
+                                    <select id="initSpeakerSelect"></select>
+                                    <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="#6B7280"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="m6 9 6 6 6-6"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div class="tob-side-actions">
+                                <button id="initJoinButton" class="tob-btn tob-btn-lg tob-btn-block tob-btn-accent">
+                                    <span>Gabung survei</span>
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M5 12h14"></path>
+                                        <path d="m13 6 6 6-6 6"></path>
+                                    </svg>
+                                </button>
+                                <button id="initBackButton" class="tob-btn tob-btn-block" type="button">Kembali</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 02 Password -->
+                <div id="tobPassword" class="tob-center hidden">
+                    <div class="tob-card tob-card-elevated tob-dialog">
+                        <div class="tob-dialog-icon">
+                            <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+                                <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+                            </svg>
+                        </div>
+                        <div class="tob-field">
+                            <h2 class="tob-h2">Ruangan ini dilindungi kata sandi</h2>
+                            <p class="tob-text-muted">
+                                Masukkan kata sandi dari surveyor untuk masuk ke
+                                <span class="tob-mono tob-room-label"></span>.
+                            </p>
+                        </div>
+                        <div class="tob-stack-sm">
+                            <label for="tobRoomPassword" class="tob-label">Kata sandi ruangan</label>
+                            <div class="tob-pw-wrap">
+                                <input
+                                    id="tobRoomPassword"
+                                    class="tob-input"
+                                    type="password"
+                                    placeholder="Masukkan kata sandi"
+                                    autocomplete="off"
+                                />
+                                <button
+                                    id="tobRoomPasswordToggle"
+                                    class="tob-pw-toggle"
+                                    type="button"
+                                    title="Tampilkan kata sandi"
+                                >
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                            <span id="tobRoomPasswordError" class="tob-error hidden"></span>
+                        </div>
+                        <div class="tob-actions">
+                            <button id="tobRoomPasswordCancel" class="tob-btn" type="button">Batal</button>
+                            <button id="tobRoomPasswordSubmit" class="tob-btn tob-btn-blue" type="button">
+                                Lanjutkan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 04 Lobby -->
+                <div id="tobLobby" class="tob-lobby hidden">
+                    <div class="tob-lobby-wrap">
+                        <img src="../images/tob/lala-mengintip.png" alt="Lala" />
+                        <div class="tob-card tob-card-elevated tob-lobby-card">
+                            <div class="tob-lobby-head">
+                                <span class="tob-pill-wait"><span class="tob-dot"></span>Menunggu</span>
+                                <h2 class="tob-h2">Menunggu host mengizinkan Anda masuk</h2>
+                                <p class="tob-text-muted">
+                                    Host sudah diberi tahu. Ruangan akan terbuka otomatis setelah Anda diizinkan.
+                                </p>
+                            </div>
+                            <div class="tob-lobby-me">
+                                <div class="tob-lobby-thumb">
+                                    <div class="tob-stage-fallback">
+                                        <div class="tob-avatar tob-avatar-sm tob-initials">TB</div>
+                                    </div>
+                                    <video id="tobLobbyVideo" playsinline="true" autoplay="" muted></video>
+                                </div>
+                                <div class="tob-lobby-who">
+                                    <span class="tob-display-name" style="font-size: 13px; font-weight: 700">Anda</span>
+                                    <span class="tob-mono tob-room-label" style="color: #6b7280"></span>
+                                </div>
+                                <div class="tob-lobby-timer">
+                                    <span class="tob-overline">Menunggu</span>
+                                    <strong id="tobLobbyTime">00:00</strong>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: center">
+                                <button id="tobLobbyLeave" class="tob-btn" type="button">
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                        <path d="m16 17 5-5-5-5M21 12H9"></path>
+                                    </svg>
+                                    <span>Keluar dari lobi</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <footer class="tob-footer">
+                <span>&copy; 2026 tob insurance</span>
+                <div class="tob-spacer"></div>
+                <a href="/about">Tentang</a>
+                <a href="/privacy">Kebijakan privasi</a>
+            </footer>
         </div>
 
         <section>
-            <div id="initUser" class="init-user hidden">
-                <!-- <p>Please allow the camera & microphone access to use this app.</p> -->
-                <div id="initVideoContainer" class="init-video-container">
-                    <video
-                        id="initVideo"
-                        playsinline="true"
-                        autoplay=""
-                        class="mirror"
-                        poster="../images/loader.gif"
-                    ></video>
-                </div>
-                <div class="initComands">
-                    <button id="initVideoAudioRefreshButton" class="fas fa-rotate"></button>
-                    <button id="initVideoButton" class="fas fa-video"></button>
-                    <button id="initAudioButton" class="fas fa-microphone"></button>
-                    <button id="initAudioVideoButton" class="fas fa-eye"></button>
-                    <button id="initStartScreenButton" class="fas fa-desktop hidden"></button>
-                    <button id="initStopScreenButton" class="fas fa-stop-circle hidden"></button>
-                    <button id="initVideoMirrorButton" class="fas fa-arrow-right-arrow-left"></button>
-                    <button id="initUsernameEmojiButton" class="fas fa-smile"></button>
-                    <select id="initVideoSelect" class="form-select text-light bg-dark"></select>
-                    <select id="initMicrophoneSelect" class="form-select text-light bg-dark"></select>
-                    <select id="initSpeakerSelect" class="form-select text-light bg-dark"></select>
-                </div>
-            </div>
             <div id="usernameEmoji" class="usernameEmoji fadein center hidden"></div>
         </section>
 
@@ -269,7 +646,7 @@ access to use this app.
                 </div>
 
                 <div class="tabActions">
-                    <div id="tabRoom" class="tabcontent" style="display: none;">
+                    <div id="tabRoom" class="tabcontent" style="display: none">
                         <button id="fileShareButton" class="hidden btn-custom">
                             <i class="fas fa-folder-open"></i>
                             <p>File sharing</p>
@@ -389,7 +766,7 @@ access to use this app.
                         </table>
                     </div>
 
-                    <div id="tabVideoDevices" class="tabcontent" style="display: block;">
+                    <div id="tabVideoDevices" class="tabcontent" style="display: block">
                         <button id="refreshVideoDevices" class="btn-custom hidden">
                             <i class="fas fa-rotate"></i>
                             <p>Refresh video devices</p>
