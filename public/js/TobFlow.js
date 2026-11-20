@@ -6,7 +6,13 @@
 // Depends on Room.js globals (room_id, RoomURL, isAudioAllowed, ...) at call time only.
 // ####################################################
 
-const TOB_SCREENS = { permission: 'tobPermission', prejoin: 'initUser', password: 'tobPassword', lobby: 'tobLobby' };
+const TOB_SCREENS = {
+    permission: 'tobPermission',
+    prejoin: 'initUser',
+    password: 'tobPassword',
+    lobby: 'tobLobby',
+    left: 'tobLeft',
+};
 const TOB_STEP_LABELS = { room: 'Ruangan', prejoin: 'Persiapan', password: 'Kata sandi', lobby: 'Lobi' };
 // Screens that belong to another step in the steps bar
 const TOB_SCREEN_STEP = { permission: 'prejoin' };
@@ -32,9 +38,13 @@ function tobShow(screen) {
     for (const [key, id] of Object.entries(TOB_SCREENS)) {
         tobEl(id).classList.toggle('hidden', key !== screen);
     }
-    const step = TOB_SCREEN_STEP[screen] || screen;
-    if (!tobSteps.includes(step)) tobSteps.splice(tobSteps.indexOf('lobby'), 0, step);
-    tobRenderSteps(step);
+    const inFlow = screen !== 'left';
+    tobEl('tobSteps').classList.toggle('hidden', !inFlow);
+    if (inFlow) {
+        const step = TOB_SCREEN_STEP[screen] || screen;
+        if (!tobSteps.includes(step)) tobSteps.splice(tobSteps.indexOf('lobby'), 0, step);
+        tobRenderSteps(step);
+    }
     flow.scrollTop = 0;
 }
 
@@ -376,4 +386,83 @@ function tobStopLobby() {
         tobLobbyStream = null;
         tobEl('tobLobbyVideo').srcObject = null;
     }
+}
+
+// ####################################################
+// IN ROOM
+// ####################################################
+
+let tobRoomStart = null;
+let tobRoomTimer = null;
+
+function tobMmss(secs) {
+    return String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
+}
+
+function tobRoomElapsed() {
+    return tobMmss(tobRoomStart ? Math.floor((Date.now() - tobRoomStart) / 1000) : 0);
+}
+
+// Show the room header and start the session timer (called once the server lets the peer in)
+function tobStartRoomHeader() {
+    const header = tobEl('tobRoomHeader');
+    header.classList.remove('hidden');
+    header.querySelectorAll('.tob-room-label').forEach((el) => (el.innerText = room_id));
+    tobEl('tobRoomShare').onclick = () => shareRoom();
+    if (!tobRoomStart) tobRoomStart = Date.now();
+    clearInterval(tobRoomTimer);
+    tobRoomTimer = setInterval(() => (tobEl('tobRoomElapsed').innerText = tobRoomElapsed()), 1000);
+}
+
+// "Anda telah keluar dari survei" screen
+function tobShowLeft() {
+    clearInterval(tobRoomTimer);
+    // The page stays open, so release the camera and mic ourselves
+    const streams = [rc?.localAudioStream, rc?.localVideoStream, rc?.localScreenStream];
+    document.querySelectorAll('video, audio').forEach((el) => streams.push(el.srcObject));
+    streams.forEach((stream) => stream?.getTracks?.().forEach((track) => track.stop()));
+    tobEl('tobRoomHeader').classList.add('hidden');
+    tobEl('tobLeftDuration').innerText = tobRoomElapsed();
+    tobEl('tobLeftRejoin').onclick = () => openURL('/join/?room=' + room_id);
+    tobInitHeader();
+    tobShow('left');
+}
+
+// Confirm dialog in the design's style; resolves true on OK
+function tobConfirm({ title, body, ok, cancel = 'Batal', danger = false }) {
+    const icon = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path>
+        </svg>`;
+    return Swal.fire({
+        title,
+        text: body,
+        showCancelButton: true,
+        confirmButtonText: ok,
+        cancelButtonText: cancel,
+        reverseButtons: true,
+        customClass: { popup: 'tob-dialog-left' + (danger ? ' tob-danger' : '') },
+        didRender: (popup) => {
+            if (!popup.querySelector('.tob-pop-icon')) {
+                popup
+                    .querySelector('.swal2-title')
+                    .insertAdjacentHTML('beforebegin', `<div class="tob-pop-icon">${icon}</div>`);
+            }
+        },
+        showClass: { popup: 'animate__animated animate__fadeIn' },
+        hideClass: { popup: 'animate__animated animate__fadeOut' },
+    }).then((result) => result.isConfirmed);
+}
+
+// Status popup body (reconnect, server away, time limit)
+function tobStatusHtml({ spinner = false, mascot = false, pill, tone = 'amber', title, body, barSecs = 0 }) {
+    return `
+        <div class="tob-status">
+            ${spinner ? '<div class="tob-status-spinner"></div>' : ''}
+            ${mascot ? '<img src="../images/tob/lala-bingung.png" alt="Lala" />' : ''}
+            <span class="tob-pill is-${tone}"><span class="tob-dot"></span>${pill}</span>
+            <div><h2>${title}</h2><p>${body}</p></div>
+            ${barSecs ? `<div class="tob-timer-bar"><span style="animation-duration:${barSecs}s"></span></div>` : ''}
+        </div>`;
 }

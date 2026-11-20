@@ -3,7 +3,8 @@
 # Everything is scoped under .tob so it does not leak into the in-call UI
 --------------------------------------------------------------*/
 
-.tob {
+/* Tokens on :root so the in-room skin (TobRoom.css) can use them outside .tob */
+:root {
     --tob-ink: #0a0f1c;
     --tob-ink-2: #374151;
     --tob-muted: #6b7280;
@@ -21,7 +22,9 @@
     --tob-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --tob-display: 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
     --tob-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
 
+.tob {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -1127,6 +1130,21 @@
 
 .tob-perm.is-denied .tob-perm-status {
     color: var(--tob-red);
+}
+
+/*--------------------------------------------------------------
+# Left the room
+--------------------------------------------------------------*/
+
+.tob-left {
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+}
+
+.tob a.tob-btn {
+    text-decoration: none;
+    color: var(--tob-ink);
 }
 
 /*--------------------------------------------------------------

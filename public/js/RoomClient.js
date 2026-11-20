@@ -481,6 +481,7 @@ class RoomClient {
     async joinAllowed(room) {
         console.log('07 ----> Join Room allowed');
         tobHide();
+        tobStartRoomHeader();
         await this.handleRoomInfo(room);
         const routerRtpCapabilities = await this.socket.request('getRouterRtpCapabilities');
         routerRtpCapabilities.headerExtensions = routerRtpCapabilities.headerExtensions.filter(
@@ -1287,12 +1288,21 @@ class RoomClient {
                 allowEscapeKey: false,
                 showDenyButton: false,
                 showConfirmButton: false,
-                icon: 'warning',
-                title: `Lost connection\n(${reason})`,
-                text: `The server may be under maintenance or your connection may have changed. Please ${this.isMobileDevice ? 'wait...' : 'check your connection.'}`,
-                showClass: { popup: 'animate__animated animate__fadeInDown' },
-                hideClass: { popup: 'animate__animated animate__fadeOutUp' },
+                html: tobStatusHtml({
+                    spinner: true,
+                    pill: 'Koneksi terputus',
+                    title: 'Menghubungkan ulang',
+                    body: 'Koneksi internet Anda terputus. Kami mencoba menghubungkan kembali secara otomatis.',
+                }),
+                showClass: { popup: 'animate__animated animate__fadeIn' },
+                hideClass: { popup: 'animate__animated animate__fadeOut' },
             });
+            console.warn('Lost connection', reason);
+        };
+        // Keep the reconnect popup's design; only the attempt line changes
+        const updateReconnectAlert = (text) => {
+            const body = Swal.getHtmlContainer()?.querySelector('.tob-status p');
+            if (body) body.innerText = text;
         };
 
         const showMaxAttemptsAlert = () => {
@@ -1303,11 +1313,14 @@ class RoomClient {
                 showDenyButton: false,
                 showConfirmButton: true,
                 background: swalBackground,
-                title: 'Unable to reconnect',
-                text: 'Please check your internet connection!',
-                icon: 'error',
-                confirmButtonText: 'Join Room',
-                confirmButtonColor: '#18392B',
+                html: tobStatusHtml({
+                    mascot: true,
+                    tone: 'red',
+                    pill: 'Gagal terhubung',
+                    title: 'Tidak dapat terhubung kembali',
+                    body: 'Periksa koneksi internet Anda, lalu gabung lagi ke ruangan.',
+                }),
+                confirmButtonText: 'Gabung lagi',
                 showClass: { popup: 'animate__animated animate__fadeInDown' },
                 hideClass: { popup: 'animate__animated animate__fadeOutUp' },
             }).then((result) => {
@@ -1343,10 +1356,7 @@ class RoomClient {
         this.socket.on('connect_error', () => {
             if (this.reconnectAttempts < this.maxReconnectAttempts) {
                 this.reconnectAttempts++;
-                reconnectAlert.update({
-                    title: 'Reconnect',
-                    text: `Attempting to reconnect ${this.reconnectAttempts}...`,
-                });
+                updateReconnectAlert(`Mencoba menghubungkan ulang (percobaan ${this.reconnectAttempts})...`);
             } else {
                 if (!serverAwayShown) {
                     showServerAwayMessage();
@@ -1363,10 +1373,7 @@ class RoomClient {
 
                 const delay = Math.min(this.reconnectInterval * this.reconnectAttempts, this.maxReconnectInterval);
 
-                reconnectAlert.update({
-                    title: 'Reconnect',
-                    text: `Attempting to reconnect in ${delay / 1000}s...`,
-                });
+                updateReconnectAlert(`Mencoba menghubungkan ulang dalam ${delay / 1000} detik...`);
 
                 reconnectTimer = setTimeout(() => {
                     this.socket.connect();
@@ -1405,10 +1412,13 @@ class RoomClient {
             showDenyButton: false,
             showConfirmButton: false,
             background: swalBackground,
-            imageUrl: image.poster,
-            title: 'Server away',
-            text: 'The server seems away or in maintenance, please wait until it come back up.',
-            denyButtonText: `Leave room`,
+            html: tobStatusHtml({
+                mascot: true,
+                pill: 'Server tidak tersedia',
+                title: 'Server sedang dalam pemeliharaan',
+                body: 'Mohon tunggu sebentar. Ruangan akan tersambung lagi setelah server kembali aktif.',
+            }),
+            denyButtonText: `Keluar`,
             showClass: { popup: 'animate__animated animate__fadeInDown' },
             hideClass: { popup: 'animate__animated animate__fadeOutUp' },
         }).then((result) => {

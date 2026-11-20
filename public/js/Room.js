@@ -423,18 +423,18 @@ function refreshMainButtonsToolTipPlacement() {
 
         // Bottom buttons
         setTippy('toggleExtraButton', 'Toggle extra buttons', bPlacement);
-        setTippy('startAudioButton', 'Start the audio', bPlacement);
-        setTippy('stopAudioButton', 'Stop the audio', bPlacement);
-        setTippy('startVideoButton', 'Start the video', bPlacement);
-        setTippy('stopVideoButton', 'Stop the video', bPlacement);
-        setTippy('swapCameraButton', 'Swap the camera', bPlacement);
+        setTippy('startAudioButton', 'Nyalakan mikrofon', bPlacement);
+        setTippy('stopAudioButton', 'Matikan mikrofon', bPlacement);
+        setTippy('startVideoButton', 'Nyalakan kamera', bPlacement);
+        setTippy('stopVideoButton', 'Matikan kamera', bPlacement);
+        setTippy('swapCameraButton', 'Ganti kamera', bPlacement);
         // setTippy('startScreenButton', 'Start screen share', bPlacement);
         // setTippy('stopScreenButton', 'Stop screen share', bPlacement);
         // setTippy('raiseHandButton', 'Raise your hand', bPlacement);
         // setTippy('lowerHandButton', 'Lower your hand', bPlacement);
         // setTippy('chatButton', 'Toggle the chat', bPlacement);
-        setTippy('settingsButton', 'Pengaturan', bPlacement);
-        setTippy('exitButton', 'Leave room', bPlacement);
+        setTippy('settingsButton', 'Pengaturan perangkat', bPlacement);
+        setTippy('exitButton', 'Keluar dari survei', bPlacement);
     }
 }
 
@@ -882,15 +882,22 @@ function getRoomDuration() {
             Swal.fire({
                 background: swalBackground,
                 position: 'center',
-                title: 'Time Limit Reached',
-                text: 'The room has reached its time limit and will close shortly',
-                icon: 'warning',
+                html: tobStatusHtml({
+                    pill: 'Ditutup dalam 6 detik',
+                    title: 'Batas waktu ruangan tercapai',
+                    body: 'Sesi survei ini telah mencapai batas waktu dan akan segera ditutup.',
+                    barSecs: 6,
+                }),
                 timer: 6000, // 6 seconds
-                timerProgressBar: true,
                 showConfirmButton: false,
                 allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
+                didOpen: (popup) => {
+                    const pill = popup.querySelector('.tob-pill');
+                    const countdown = setInterval(() => {
+                        const left = Math.ceil((Swal.getTimerLeft() || 0) / 1000);
+                        if (!Swal.isVisible() || left <= 0) return clearInterval(countdown);
+                        pill.lastChild.textContent = `Ditutup dalam ${left} detik`;
+                    }, 250);
                 },
                 willClose: () => {
                     rc.exitRoom(true);
@@ -1247,24 +1254,27 @@ async function shareRoom(useNavigator = false) {
         Swal.fire({
             background: swalBackground,
             position: 'center',
-            title: 'Share the room',
+            width: 480,
+            title: 'Bagikan ruangan',
             html: `
-            <div id="qrRoomContainer">
-                <canvas id="qrRoom"></canvas>
-            </div>
-            <br/>
-            <p style="background:transparent; color:rgb(8, 189, 89);">Join from your mobile device</p>
-            <p style="background:transparent; color:white; font-family: Arial, Helvetica, sans-serif;">No need for apps, simply capture the QR code with your mobile camera Or Invite someone else to join by sending them the following URL</p>
-            <p style="background:transparent; color:rgb(8, 189, 89);">${RoomURL}</p>`,
+            <div class="tob-share">
+                <p>Pindai kode QR dengan kamera ponsel, atau kirim tautan ini ke peserta lain. Tidak perlu aplikasi.</p>
+                <div class="tob-share-row">
+                    <div id="qrRoomContainer" class="tob-share-qr"><canvas id="qrRoom"></canvas></div>
+                    <div class="tob-share-link">
+                        <span class="tob-overline">Tautan ruangan</span>
+                        <div class="tob-share-url" title="${RoomURL}">${RoomURL}</div>
+                    </div>
+                </div>
+            </div>`,
             showDenyButton: true,
-            showCancelButton: true,
-            cancelButtonColor: 'red',
-            denyButtonColor: 'green',
-            confirmButtonText: `Copy URL`,
-            denyButtonText: `Email invite`,
-            cancelButtonText: `Close`,
-            showClass: { popup: 'animate__animated animate__fadeInDown' },
-            hideClass: { popup: 'animate__animated animate__fadeOutUp' },
+            showCloseButton: true,
+            confirmButtonText: `Salin tautan`,
+            denyButtonText: `Undang lewat email`,
+            reverseButtons: true,
+            customClass: { popup: 'tob-dialog-left' },
+            showClass: { popup: 'animate__animated animate__fadeIn' },
+            hideClass: { popup: 'animate__animated animate__fadeOut' },
         }).then((result) => {
             if (result.isConfirmed) {
                 copyRoomURL();
@@ -1302,7 +1312,7 @@ function copyRoomURL() {
     tmpInput.setSelectionRange(0, 99999); // For mobile devices
     navigator.clipboard.writeText(tmpInput.value);
     document.body.removeChild(tmpInput);
-    userLog('info', 'Meeting URL copied to clipboard 👍', 'top-end');
+    userLog('success', 'Tautan ruangan disalin', 'top-end');
 }
 
 function copyToClipboard(txt, showTxt = true) {
@@ -1628,8 +1638,14 @@ function handleButtons() {
     bottomButtons.onmouseout = () => {
         isButtonsBarOver = false;
     };
-    exitButton.onclick = () => {
-        rc.exitRoom();
+    exitButton.onclick = async () => {
+        const leave = await tobConfirm({
+            title: 'Keluar dari survei?',
+            body: 'Surveyor akan diberi tahu. Anda bisa bergabung lagi lewat tautan yang sama.',
+            ok: 'Keluar',
+            danger: true,
+        });
+        if (leave) rc.exitRoom();
     };
     shareButton.onclick = () => {
         shareRoom(true);
@@ -3448,6 +3464,11 @@ function handleRoomClientEvents() {
     });
 }
 
+// TOB: show the "Anda telah keluar" screen unless a redirect URL is configured
+function redirectOnLeave() {
+    redirect && redirect.enabled ? openURL(redirect.url) : tobShowLeft();
+}
+
 // ####################################################
 // UTILITY
 // ####################################################
@@ -3458,11 +3479,13 @@ function leaveFeedback() {
         allowEscapeKey: false,
         showDenyButton: true,
         background: swalBackground,
-        imageUrl: image.feedback,
-        title: 'Leave a feedback',
-        text: 'Do you want to rate your MiroTalk experience?',
-        confirmButtonText: `Yes`,
-        denyButtonText: `No`,
+        imageUrl: '../images/tob/tobi-thumbs-up.png',
+        imageWidth: 140,
+        title: 'Survei selesai',
+        text: 'Bagaimana pengalaman Anda dengan TOB Live Survey?',
+        confirmButtonText: `Beri penilaian`,
+        denyButtonText: `Lewati`,
+        reverseButtons: true,
         showClass: { popup: 'animate__animated animate__fadeInDown' },
         hideClass: { popup: 'animate__animated animate__fadeOutUp' },
     }).then((result) => {
@@ -3472,10 +3495,6 @@ function leaveFeedback() {
             redirectOnLeave();
         }
     });
-}
-
-function redirectOnLeave() {
-    redirect && redirect.enabled ? openURL(redirect.url) : openURL('/newroom');
 }
 
 function userLog(icon, message, position, timer = 3000) {

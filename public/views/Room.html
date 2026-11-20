@@ -47,6 +47,7 @@
         <link rel="stylesheet" href="../css/Polls.css" />
         <link rel="stylesheet" href="../css/Editor.css" />
         <link rel="stylesheet" href="../css/TobSurvey.css" />
+        <link rel="stylesheet" href="../css/TobRoom.css" />
 
         <!-- TOB Live Survey fonts -->
 
@@ -544,6 +545,18 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Left the room -->
+                <div id="tobLeft" class="tob-center hidden">
+                    <div class="tob-card tob-dialog tob-left">
+                        <h2 class="tob-h2">Anda telah keluar dari survei</h2>
+                        <p class="tob-text-muted">Durasi sesi <span id="tobLeftDuration">00:00</span></p>
+                        <div class="tob-actions tob-actions-center">
+                            <a class="tob-btn" href="/">Ke beranda</a>
+                            <button id="tobLeftRejoin" class="tob-btn tob-btn-blue" type="button">Gabung lagi</button>
+                        </div>
+                    </div>
+                </div>
             </main>
 
             <footer class="tob-footer">
@@ -588,8 +601,53 @@
             <button id="lowerHandButton" class="hidden"><i id="lowerHandIcon" class="fas fa-hand-paper"></i></button>
             <button id="chatButton" class="hidden"><i class="fas fa-comments"></i></button>
             <button id="settingsButton" class="hidden"><i class="fas fa-cogs"></i></button>
-            <button id="exitButton" class="hidden"><i class="fa-solid fa-phone-slash"></i></button>
+            <button id="exitButton" class="hidden">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i><span>Keluar</span>
+            </button>
         </div>
+
+        <!-- TOB Live Survey room header (see TobFlow.js tobStartRoomHeader) -->
+        <header id="tobRoomHeader" class="tob tob-room-header hidden">
+            <img src="../images/tob/brand-mark.svg" alt="tob" width="32" height="32" />
+            <span class="tob-brand-title">TOB Live Survey</span>
+            <div class="tob-room-divider"></div>
+            <div class="tob-room-chip"><span class="tob-room-label"></span></div>
+            <div class="tob-room-chip">
+                <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M12 7v5l3 2"></path>
+                </svg>
+                <span id="tobRoomElapsed">00:00</span>
+            </div>
+            <div class="tob-spacer"></div>
+            <button id="tobRoomShare" class="tob-btn" type="button">
+                <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"></path>
+                </svg>
+                <span>Bagikan ruangan</span>
+            </button>
+        </header>
 
         <div id="emojiPickerContainer" class="roomEmoji fadein">
             <div id="emojiPickerHeader" class="emojiPickerHeader">

@@ -1,0 +1,624 @@
+/*--------------------------------------------------------------
+# TOB Live Survey: in-room skin (header, video tiles, control bar,
+# popups and toasts). Loaded after Room.css / VideoGrid.css and
+# overrides the upstream dark theme. Tokens come from TobSurvey.css.
+--------------------------------------------------------------*/
+
+body {
+    background-color: var(--tob-bg) !important;
+    background-image: radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.025) 1px, transparent 0) !important;
+    background-size: 24px 24px !important;
+    font-family: var(--tob-sans);
+}
+
+/*--------------------------------------------------------------
+# Header
+--------------------------------------------------------------*/
+
+.tob-room-header {
+    position: fixed;
+    z-index: 4;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    min-height: 0;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--tob-line);
+    background: rgba(246, 247, 249, 0.92);
+    background-image: none;
+    backdrop-filter: blur(6px);
+    color: var(--tob-ink);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.tob-room-header .tob-brand-title {
+    white-space: nowrap;
+}
+
+.tob-room-header img {
+    display: block;
+    flex: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(238, 118, 37, 0.25);
+}
+
+.tob-room-divider {
+    width: 1px;
+    height: 24px;
+    flex: none;
+    background: var(--tob-line);
+}
+
+.tob-room-chip {
+    height: 32px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid var(--tob-line);
+    border-radius: 10px;
+    font-family: var(--tob-mono);
+    font-size: 12px;
+}
+
+.tob-room-chip span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.tob-room-chip svg {
+    flex: none;
+}
+
+.tob-room-header .tob-btn {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+}
+
+/*--------------------------------------------------------------
+# Video grid
+--------------------------------------------------------------*/
+
+#videoMediaContainer {
+    top: 64px;
+    left: 16px;
+    width: calc(100% - 32px);
+    height: calc(100% - 64px - 92px);
+}
+
+.Camera {
+    border-radius: 16px;
+    box-shadow: none;
+    background-color: #0b1220;
+    background-image: radial-gradient(circle at 90% 0%, rgba(238, 118, 37, 0.18) 0%, transparent 55%),
+        radial-gradient(circle at 0% 100%, rgba(22, 94, 160, 0.22) 0%, transparent 55%);
+}
+
+#videoMediaContainer video,
+#videoPinMediaContainer video {
+    border-radius: 16px;
+}
+
+.Camera .username {
+    left: 0;
+    right: auto;
+    margin: 12px;
+    height: 28px;
+    padding: 0 10px;
+    gap: 6px;
+    border-radius: 8px;
+    background: rgba(10, 15, 28, 0.6);
+    font-family: var(--tob-sans);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/*--------------------------------------------------------------
+# Control bar
+--------------------------------------------------------------*/
+
+#bottomButtons {
+    display: flex !important;
+    top: auto;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    flex-direction: row;
+    gap: 8px;
+    padding: 8px;
+    background: #ffffff;
+    border: 1px solid var(--tob-line);
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+#bottomButtons button {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--tob-line) !important;
+    background: #ffffff;
+    color: var(--tob-ink);
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+#bottomButtons button.hidden {
+    display: none;
+}
+
+#bottomButtons button:hover {
+    transform: none;
+    background: var(--tob-soft) !important;
+    border-color: #d1d5db !important;
+}
+
+#bottomButtons button:active {
+    transform: scale(0.98);
+}
+
+/* Muted mic / camera off: the "start" buttons are the ones showing */
+#bottomButtons #startAudioButton,
+#bottomButtons #startVideoButton {
+    background: #fef2f2;
+    color: var(--tob-red);
+    border-color: rgba(220, 38, 38, 0.15) !important;
+}
+
+#bottomButtons #startAudioButton:hover,
+#bottomButtons #startVideoButton:hover {
+    background: #fde8e8 !important;
+}
+
+#bottomButtons #exitButton {
+    width: auto;
+    padding: 0 16px;
+    gap: 8px;
+    margin-left: 4px;
+    background: var(--tob-red);
+    color: #ffffff;
+    border-color: transparent !important;
+    font: 600 13px/1 var(--tob-sans);
+}
+
+#bottomButtons #exitButton:hover {
+    background: var(--tob-red) !important;
+    filter: brightness(1.06);
+}
+
+#bottomButtons #exitButton i {
+    font-size: 16px;
+}
+
+/* Extra (host) tools column */
+#control {
+    gap: 6px;
+    padding: 6px;
+    background: #ffffff;
+    border: 1px solid var(--tob-line);
+    border-radius: 14px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+#control button {
+    background: #ffffff;
+    color: var(--tob-ink);
+}
+
+#control button:hover {
+    transform: none;
+    background: var(--tob-soft) !important;
+}
+
+/*--------------------------------------------------------------
+# Popups (Swal)
+--------------------------------------------------------------*/
+
+.swal2-popup:not(.swal2-toast) {
+    background: #ffffff !important;
+    color: var(--tob-ink);
+    border-radius: 20px !important;
+    padding: 28px !important;
+    font-family: var(--tob-sans);
+    box-shadow:
+        0 20px 40px rgba(15, 23, 42, 0.08),
+        0 4px 12px rgba(15, 23, 42, 0.04) !important;
+}
+
+body:not(.swal2-toast-shown) .swal2-container.swal2-backdrop-show {
+    background: rgba(10, 15, 28, 0.45) !important;
+}
+
+body.swal2-toast-shown .swal2-container {
+    background: transparent !important;
+}
+
+/* Toasts sit below the room header */
+.swal2-container.swal2-top-end,
+.swal2-container.swal2-top-right {
+    top: 64px !important;
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-title {
+    padding: 0;
+    color: var(--tob-ink) !important;
+    font-family: var(--tob-display);
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-html-container {
+    margin: 10px 0 0;
+    padding: 0;
+    color: var(--tob-muted) !important;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-input,
+.swal2-popup:not(.swal2-toast) .swal2-select,
+.swal2-popup:not(.swal2-toast) .swal2-textarea {
+    color: var(--tob-ink) !important;
+    background: var(--tob-soft) !important;
+    border: 1px solid var(--tob-line) !important;
+    border-radius: 10px;
+    font-family: var(--tob-sans);
+    font-size: 14px;
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-actions {
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-styled {
+    margin: 0;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 10px !important;
+    font: 600 13px/1 var(--tob-sans);
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-styled.swal2-confirm {
+    background: var(--tob-blue) !important;
+    color: #ffffff;
+    border: 1px solid transparent;
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-styled.swal2-deny,
+.swal2-popup:not(.swal2-toast) .swal2-styled.swal2-cancel {
+    background: #ffffff !important;
+    color: var(--tob-ink);
+    border: 1px solid var(--tob-line);
+}
+
+.swal2-popup:not(.swal2-toast) .swal2-styled.swal2-deny:hover,
+.swal2-popup:not(.swal2-toast) .swal2-styled.swal2-cancel:hover {
+    background-image: none;
+    background: var(--tob-soft) !important;
+    border-color: #d1d5db;
+}
+
+/* Destructive confirm (leave, delete) */
+.swal2-popup.tob-danger .swal2-styled.swal2-confirm {
+    background: var(--tob-red) !important;
+}
+
+/* Left-aligned dialog (confirms, share) */
+.swal2-popup.tob-dialog-left .swal2-title,
+.swal2-popup.tob-dialog-left .swal2-html-container {
+    text-align: left;
+}
+
+.swal2-popup.tob-dialog-left .swal2-actions {
+    justify-content: flex-end;
+    width: 100%;
+}
+
+.tob-pop-icon {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--tob-blue-soft);
+    color: var(--tob-blue);
+}
+
+.tob-danger .tob-pop-icon {
+    background: #fef2f2;
+    color: var(--tob-red);
+}
+
+/* Share popup */
+.tob-share {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    text-align: left;
+}
+
+.tob-share p {
+    margin: 0;
+    color: var(--tob-muted) !important;
+    font-size: 13px;
+    text-wrap: pretty;
+}
+
+.tob-share-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.tob-share-qr {
+    width: 136px;
+    height: 136px;
+    flex: none;
+    padding: 8px;
+    border: 1px solid var(--tob-line);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.tob-share-qr canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}
+
+.tob-share-link {
+    flex: 1 1 200px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tob-share-url {
+    height: 40px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--tob-line);
+    border-radius: 10px;
+    background: var(--tob-soft);
+    color: var(--tob-ink);
+    font-family: var(--tob-mono);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Status popups (reconnect, server away, time limit) */
+.tob-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+}
+
+.tob-status img {
+    width: 120px;
+    height: auto;
+    display: block;
+}
+
+.tob-status h2 {
+    margin: 0;
+    color: var(--tob-ink);
+    font-family: var(--tob-display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+}
+
+.tob-status p {
+    margin: 6px 0 0;
+    color: var(--tob-muted);
+    font-size: 13px;
+    text-wrap: pretty;
+}
+
+.tob-status-spinner {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid var(--tob-blue-soft);
+    border-top-color: var(--tob-blue);
+    animation: tob-spin 0.8s linear infinite;
+}
+
+.tob-pill.is-amber {
+    background: rgba(217, 119, 6, 0.1);
+    border-color: rgba(217, 119, 6, 0.15);
+    color: var(--tob-amber);
+}
+
+.tob-pill.is-red {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.15);
+    color: var(--tob-red);
+}
+
+.tob-timer-bar {
+    width: 100%;
+    height: 4px;
+    border-radius: 4px;
+    background: #edf0f4;
+    overflow: hidden;
+}
+
+.tob-timer-bar span {
+    display: block;
+    height: 100%;
+    background: var(--tob-amber);
+    transform-origin: left;
+    animation: tob-bar linear forwards;
+}
+
+@keyframes tob-bar {
+    from {
+        transform: scaleX(1);
+    }
+    to {
+        transform: scaleX(0);
+    }
+}
+
+/*--------------------------------------------------------------
+# Toasts (userLog)
+--------------------------------------------------------------*/
+
+.swal2-popup.swal2-toast {
+    background: #ffffff !important;
+    border: 1px solid var(--tob-line);
+    border-radius: 12px !important;
+    padding: 10px 12px !important;
+    box-shadow:
+        0 20px 40px rgba(15, 23, 42, 0.08),
+        0 4px 12px rgba(15, 23, 42, 0.04) !important;
+    font-family: var(--tob-sans);
+}
+
+.swal2-popup.swal2-toast .swal2-title {
+    margin: 0 0 0 10px;
+    color: var(--tob-ink) !important;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.swal2-popup.swal2-toast .swal2-icon {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    margin: 0;
+    border: none;
+    border-radius: 8px;
+}
+
+.swal2-popup.swal2-toast .swal2-icon .swal2-icon-content {
+    font: 800 13px/1 var(--tob-display);
+}
+
+.swal2-toast .swal2-icon.swal2-info {
+    background: var(--tob-blue-soft);
+    color: var(--tob-blue);
+}
+
+.swal2-toast .swal2-icon.swal2-success {
+    background: #ecfdf5;
+    color: var(--tob-green);
+}
+
+.swal2-toast .swal2-icon.swal2-warning,
+.swal2-toast .swal2-icon.swal2-question {
+    background: #fffbeb;
+    color: var(--tob-amber);
+}
+
+.swal2-toast .swal2-icon.swal2-error {
+    background: #fef2f2;
+    color: var(--tob-red);
+}
+
+/* Swal's animated success/error marks don't fit a 28px tile; show a glyph instead */
+.swal2-toast .swal2-icon.swal2-success > *,
+.swal2-toast .swal2-icon.swal2-error > * {
+    display: none !important;
+}
+
+.swal2-toast .swal2-icon.swal2-success::before,
+.swal2-toast .swal2-icon.swal2-error::before {
+    display: none !important;
+}
+
+.swal2-toast .swal2-icon.swal2-success::after,
+.swal2-toast .swal2-icon.swal2-error::after {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    transform: none !important;
+    background: none !important;
+    font: 800 13px/1 var(--tob-display);
+}
+
+.swal2-popup.swal2-toast .swal2-icon.swal2-icon-show {
+    align-items: center;
+    justify-content: center;
+}
+
+.swal2-toast .swal2-icon.swal2-success::after {
+    content: '✓';
+}
+
+.swal2-toast .swal2-icon.swal2-error::after {
+    content: '!';
+}
+
+.swal2-toast .swal2-timer-progress-bar-container {
+    background: transparent;
+}
+
+.swal2-toast .swal2-timer-progress-bar {
+    background-color: var(--tob-line) !important;
+}
+
+/*--------------------------------------------------------------
+# Small screens
+--------------------------------------------------------------*/
+
+@media (max-width: 640px) {
+    .tob-room-header {
+        padding: 0 12px;
+        gap: 8px;
+    }
+    .tob-room-header .tob-brand-title,
+    .tob-room-header .tob-room-divider,
+    .tob-room-header .tob-btn span {
+        display: none;
+    }
+    .tob-room-header .tob-btn {
+        padding: 0 10px;
+    }
+    #videoMediaContainer {
+        left: 8px;
+        width: calc(100% - 16px);
+    }
+    #bottomButtons {
+        bottom: 12px;
+        max-width: calc(100vw - 24px);
+    }
+    #bottomButtons #exitButton span {
+        display: none;
+    }
+}
