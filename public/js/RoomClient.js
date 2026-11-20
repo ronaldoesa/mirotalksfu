@@ -299,7 +299,7 @@ class RoomClient {
         this.isToggleRaiseHand = false;
         this.pinnedVideoPlayerId = null;
         this.camVideo = false;
-        this.camera = 'user';
+        this.camera = isBackCameraSelected ? 'environment' : 'user';
         this.videoQualitySelectedIndex = 0;
 
         this.pollSelectedOptions = {};
@@ -998,7 +998,31 @@ class RoomClient {
         return `${dayName}, ${day} ${month} ${year} ${hours}:${minutes} ${ampm}`;
     }
 
-    captureLocalEvidence() {
+    async takeCameraPhoto(track) {
+        if (!('ImageCapture' in window) || !track || track.readyState !== 'live') return null;
+        try {
+            const imageCapture = new ImageCapture(track);
+            const photoSettings = {};
+            try {
+                const caps = await imageCapture.getPhotoCapabilities();
+                if (caps.imageWidth && caps.imageWidth.max) photoSettings.imageWidth = caps.imageWidth.max;
+                if (caps.imageHeight && caps.imageHeight.max) photoSettings.imageHeight = caps.imageHeight.max;
+            } catch (err) {
+                console.warn('getPhotoCapabilities not available', err);
+            }
+            // Some devices never resolve takePhoto, don't hang the snapshot
+            const blob = await Promise.race([
+                imageCapture.takePhoto(photoSettings),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('takePhoto timeout')), 5000)),
+            ]);
+            return await createImageBitmap(blob);
+        } catch (err) {
+            console.warn('ImageCapture failed, falling back to video frame', err);
+            return null;
+        }
+    }
+
+    async captureLocalEvidence() {
         // 🔐 Rate limit (local enforcement)
         const now = Date.now();
         if (this.lastSnapshotTs && now - this.lastSnapshotTs < 3000) {
@@ -1028,27 +1052,37 @@ class RoomClient {
             return;
         }
 
-        const w = video.videoWidth;
-        const h = video.videoHeight;
+        // 📷 Prefer a full-resolution photo straight from the camera (independent of WebRTC
+        // bandwidth adaptation), fall back to the current preview frame if unsupported (e.g. Safari)
+        const track = video.srcObject.getVideoTracks()[0];
+        const photo = await this.takeCameraPhoto(track);
+        const source = photo || video;
+
+        const w = photo ? photo.width : video.videoWidth;
+        const h = photo ? photo.height : video.videoHeight;
+        console.log(`📸 Snapshot source: ${photo ? 'ImageCapture' : 'video frame'} ${w}x${h}`);
 
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
 
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(source, 0, 0, w, h);
+        if (photo) photo.close();
 
         // 🟡 WATERMARK START
         const timestamp = this.formatSnapshotDate();
 
-        ctx.font = '28px Arial';
-        ctx.lineWidth = 3;
+        // Scale watermark with image size (28px @ 1080p)
+        const fontSize = Math.max(28, Math.round(h * 0.026));
+        ctx.font = `${fontSize}px Arial`;
+        ctx.lineWidth = Math.max(3, Math.round(fontSize / 9));
         ctx.strokeStyle = 'rgba(0,0,0,0.7)';
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.textAlign = 'right';
 
-        ctx.strokeText(timestamp, w - 20, h - 30);
-        ctx.fillText(timestamp, w - 20, h - 30);
+        ctx.strokeText(timestamp, w - fontSize * 0.7, h - fontSize);
+        ctx.fillText(timestamp, w - fontSize * 0.7, h - fontSize);
 
         ctx.textAlign = 'left';
         // 🟡 WATERMARK END
@@ -1789,8 +1823,10 @@ class RoomClient {
 
     getCameraConstraints() {
         this.camera = this.camera == 'user' ? 'environment' : 'user';
-        if (this.camera != 'user') this.camVideo = { facingMode: { exact: this.camera } };
-        else this.camVideo = true;
+        // Request HD on swap too, `video: true` defaults to 640x480 on most devices
+        const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        if (this.camera != 'user') this.camVideo = { ...hd, facingMode: { exact: this.camera } };
+        else this.camVideo = { ...hd, facingMode: 'user' };
         return {
             audio: false,
             video: this.camVideo,

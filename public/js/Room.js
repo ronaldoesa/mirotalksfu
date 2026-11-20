@@ -225,6 +225,7 @@ let isLobbyOpen = false;
 let hostOnlyRecording = false;
 let isEnumerateAudioDevices = false;
 let isEnumerateVideoDevices = false;
+let isBackCameraSelected = false;
 let isAudioAllowed = false;
 let isVideoAllowed = false;
 let isVideoPrivacyActive = false;
@@ -2226,7 +2227,32 @@ async function setSelectsInit() {
         //
         console.log('04.4 ----> Get Local Storage Devices after', lS.getLocalStorageDevices());
     }
+    selectBestBackCamera();
     if (initVideoSelect.value) await changeCamera(initVideoSelect.value);
+}
+
+function selectBestBackCamera() {
+    // Prefer the main rear camera so the customer doesn't have to pick it manually
+    const backRegex = /back|rear|environment/i;
+    const secondaryRegex = /ultra|wide|tele|depth|infrared|\bir\b|macro|dual|triple/i;
+    const options = Array.from(initVideoSelect.options);
+    const backOptions = options.filter((option) => backRegex.test(option.innerText));
+    if (backOptions.length === 0) {
+        console.log('04.6 ----> No back camera found, keep current camera');
+        return;
+    }
+    // Android labels: "camera2 <id>, facing back" - the lowest id is usually the main lens
+    const cameraId = (option) => {
+        const match = option.innerText.match(/camera\d?\s*(\d+)/i);
+        return match ? parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
+    };
+    const mainOptions = backOptions.filter((option) => !secondaryRegex.test(option.innerText));
+    const best = (mainOptions.length ? mainOptions : backOptions).sort((a, b) => cameraId(a) - cameraId(b))[0];
+    initVideoSelect.selectedIndex = best.index;
+    videoSelect.selectedIndex = best.index;
+    isBackCameraSelected = true;
+    refreshLsDevices();
+    console.log('04.6 ----> Auto selected back camera', best.innerText);
 }
 
 function selectOptionByValueExist(selectElement, value) {
@@ -2259,8 +2285,8 @@ async function changeCamera(deviceId) {
     const videoConstraints = {
         audio: false,
         video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
             deviceId: deviceId,
             aspectRatio: 1.777,
         },
