@@ -125,6 +125,12 @@ body {
     white-space: nowrap;
 }
 
+/* The per-video menu bar (snapshot, pin, mirror, ...) opens fixed at the top
+   of the screen; keep it above the room header (z-index 4) */
+.videoMenuBar {
+    z-index: 5;
+}
+
 /*--------------------------------------------------------------
 # Control bar
 --------------------------------------------------------------*/
