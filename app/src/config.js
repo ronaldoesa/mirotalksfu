@@ -1,8 +1,9 @@
 'use strict';
 
 const os = require('os');
-const rtcMinPort = 40000;
-const rtcMaxPort = 40100;
+// Overridable per instance so UAT can run on the same host as LIVE (set via pm2 env)
+const rtcMinPort = parseInt(process.env.RTC_MIN_PORT) || 40000;
+const rtcMaxPort = parseInt(process.env.RTC_MAX_PORT) || 40100;
 
 // https://api.ipify.org
 
@@ -289,8 +290,7 @@ module.exports = {
         connectionString: "DefaultEndpointsProtocol=https;AccountName=tobstorage;AccountKey=uDHWnkucu+QXHxVb1+HsdjKu9aNobKloV1sLU+jObCiIcuTLFMwTNCzLuXns6vRdO1vvxzPyg0/hE9wrBC622Q==;EndpointSuffix=core.windows.net",
         containerName: "tobclaimreport",
         folderName: "livesurvey",
-        //env: "UAT",
-        env: "LIVE",
+        env: process.env.AZURE_ENV || "LIVE", // "UAT" or "LIVE"
     },
     sentry: {
         /*
@@ -553,8 +553,8 @@ module.exports = {
         // Worker settings
         numWorkers: numWorkers,
         worker: {
-            rtcMinPort: 40000,
-            rtcMaxPort: 40100,
+            rtcMinPort: rtcMinPort,
+            rtcMaxPort: rtcMaxPort,
             disableLiburing: false, // https://github.com/axboe/liburing
             logLevel: 'error',
             logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp', 'rtx', 'bwe', 'score', 'simulcast', 'svc', 'sctp'],
@@ -621,13 +621,13 @@ module.exports = {
                     protocol: 'udp',
                     ip: '0.0.0.0',
                     announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40000 + numWorkers },
+                    portRange: { min: rtcMinPort, max: rtcMinPort + numWorkers },
                 },
                 {
                     protocol: 'tcp',
                     ip: '0.0.0.0',
                     announcedAddress: IPv4,
-                    portRange: { min: 40000, max: 40000 + numWorkers },
+                    portRange: { min: rtcMinPort, max: rtcMinPort + numWorkers },
                 },
             ],
         },
@@ -636,8 +636,8 @@ module.exports = {
             listenInfos: [
                  //{ protocol: 'udp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
                  //{ protocol: 'tcp', ip: IPv4, portRange: { min: 40000, max: 40100 } },
-                 { protocol: 'udp', ip: '0.0.0.0', announcedAddress: IPv4, portRange: { min: 40000, max: 40100 }},
-		 { protocol: 'tcp', ip: '0.0.0.0', announcedAddress: IPv4, portRange: { min: 40000, max: 40100 }},
+                 { protocol: 'udp', ip: '0.0.0.0', announcedAddress: IPv4, portRange: { min: rtcMinPort, max: rtcMaxPort }},
+		 { protocol: 'tcp', ip: '0.0.0.0', announcedAddress: IPv4, portRange: { min: rtcMinPort, max: rtcMaxPort }},
             ],
             initialAvailableOutgoingBitrate: 1000000,
             minimumAvailableOutgoingBitrate: 600000,
