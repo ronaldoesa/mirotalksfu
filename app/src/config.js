@@ -488,6 +488,7 @@ module.exports = {
                 videoMirrorButton: true,
                 fullScreenButton: true,
                 snapShotButton: true,
+                torchButton: true, // presenter: remote flashlight on the customer camera
                 focusVideoButton: true,
                 sendMessageButton: true,
                 sendFileButton: true,
