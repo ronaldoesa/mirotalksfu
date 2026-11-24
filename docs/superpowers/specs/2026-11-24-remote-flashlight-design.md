@@ -53,7 +53,10 @@ During a live survey the surveyor can turn the customer's camera flashlight on a
   - Initialise both to `false`.
 - `app/src/Server.js`
   - Add `'torch'` to `presenterActions` in the `peerAction` handler, so non-presenters can't toggle.
+  - For `torch`, the presenter check uses the sender's own stored `peer_name` / `peer_uuid`, not the payload's `from_peer_*`. `isPeerPresenter` falls back to a name match for reconnects, so payload names could be spoofed. The other presenter actions still have that weakness; that's pre-existing and out of scope.
   - `torchFailed` is a plain relay back to the presenter.
+- `app/src/config.js` and `config.template.js`
+  - `ui.buttons.consumerVideo.torchButton: true`. The client merges server buttons shallowly, so the flag must exist here too, or the server's `consumerVideo` drops it.
 - `public/js/RoomClient.js`
   - Customer side: `reportTorchCapability()`, `applyTorch(status)`, the peer-action handlers for `torch`, and the hooks in `produce` and `closeProducer`.
   - Surveyor side: build the pill and the on-chip in the consumer video tile, plus `handleTorchToggle(peer_id)`.
