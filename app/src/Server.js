@@ -2085,11 +2085,14 @@ function startServer() {
             ];
 
             if (presenterActions.some((v) => data.action === v)) {
+                // Torch: check the sender's own name/uuid, not the ones in the payload
+                const sender = data.action === 'torch' ? getRoomAndPeer(socket).peer : null;
+                if (data.action === 'torch' && !sender) return;
                 const isPresenter = isPeerPresenter(
                     socket.room_id,
                     socket.id,
-                    data.from_peer_name,
-                    data.from_peer_uuid,
+                    sender ? sender.peer_name : data.from_peer_name,
+                    sender ? sender.peer_uuid : data.from_peer_uuid,
                 );
                 if (!isPresenter) return;
             }
