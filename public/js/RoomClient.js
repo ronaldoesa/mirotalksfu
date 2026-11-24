@@ -223,6 +223,12 @@ class RoomClient {
         this.peer_uuid = peer_uuid;
         this.peer_info = peer_info;
 
+        // Remote flashlight: own camera track + torch, and the remote peers' torch state
+        this.cameraTrack = null;
+        this.torchOn = false;
+        this.peerTorch = new Map(); // peer_id -> { supported, on, since, pending }
+        this.peerTorchTimer = null;
+
         // Device type
         this.isDesktopDevice = peer_info.is_desktop_device;
         this.isMobileDevice = peer_info.is_mobile_device;
@@ -1124,6 +1130,173 @@ class RoomClient {
         );
     }
 
+    // ####################################################
+    // REMOTE FLASHLIGHT (camera owner side)
+    // ####################################################
+
+    isTorchSupported(track) {
+        try {
+            return !!(track && track.readyState === 'live' && track.getCapabilities().torch);
+        } catch (err) {
+            return false;
+        }
+    }
+
+    reportTorch(supported, on) {
+        this.torchOn = on;
+        this.updatePeerInfo(this.peer_name, this.peer_id, 'torchSupported', supported);
+        this.updatePeerInfo(this.peer_name, this.peer_id, 'torch', on);
+        this.setTorchIndicator(on);
+    }
+
+    async applyTorch(on) {
+        const track = this.cameraTrack;
+        if (!this.isTorchSupported(track)) throw new Error('Torch not supported on this camera');
+        // applyConstraints replaces every constraint, keep the current ones (resolution, fps, device)
+        const { advanced, ...current } = track.getConstraints();
+        await track.applyConstraints({ ...current, advanced: [{ torch: on }] });
+    }
+
+    async handleTorchRequest(data) {
+        try {
+            await this.applyTorch(data.status);
+            this.torchOn = data.status;
+            this.updatePeerInfo(this.peer_name, this.peer_id, 'torch', data.status);
+            this.setTorchIndicator(data.status);
+        } catch (err) {
+            console.warn('Torch toggle failed', err);
+            this.socket.emit('peerAction', {
+                action: 'torchFailed',
+                peer_id: data.from_peer_id,
+                from_peer_id: this.peer_id,
+                from_peer_name: this.peer_name,
+            });
+        }
+    }
+
+    setTorchIndicator(on) {
+        const chip = this.getId('tobTorchChip');
+        const status = this.getId('tobTorchStatus');
+        if (chip) chip.classList.toggle('hidden', !on);
+        if (status) status.classList.toggle('hidden', !on);
+    }
+
+    // ####################################################
+    // REMOTE FLASHLIGHT (surveyor side)
+    // ####################################################
+
+    createTorchControls(peer_id, peer_info) {
+        // The map holds every broadcast received so far, so it is never older than peer_info
+        if (!this.peerTorch.has(peer_id)) {
+            this.peerTorch.set(peer_id, {
+                supported: !!peer_info.peer_torch_supported,
+                on: !!peer_info.peer_torch,
+                since: peer_info.peer_torch ? Date.now() : 0,
+                pending: null,
+            });
+        }
+        const icon =
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 2-2 2-2 4v10a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V10c0-2-2-2-2-4V2h12z"/><path d="M6 6h12"/></svg>';
+        const wrap = document.createElement('div');
+        wrap.id = peer_id + '__torch';
+        wrap.className = 'tob-torch';
+        wrap.innerHTML =
+            `<div class="tob-torch-chip">${icon}<span>Senter</span><span class="tob-torch-time">00:00</span>` +
+            `<button type="button">Matikan</button></div>` +
+            `<button type="button" class="tob-torch-pill">${icon}<span class="tob-torch-label">Senter</span></button>`;
+        const toggle = (e) => {
+            e.stopPropagation();
+            this.requestTorch(peer_id);
+        };
+        wrap.querySelector('.tob-torch-pill').onclick = toggle;
+        wrap.querySelector('.tob-torch-chip button').onclick = toggle;
+        return wrap;
+    }
+
+    requestTorch(peer_id) {
+        const state = this.peerTorch.get(peer_id);
+        if (!state || !state.supported || state.pending) return;
+        state.pending = setTimeout(() => {
+            state.pending = null;
+            this.renderTorch(peer_id);
+        }, 5000);
+        this.socket.emit('peerAction', {
+            action: 'torch',
+            status: !state.on,
+            peer_id: peer_id,
+            from_peer_id: this.peer_id,
+            from_peer_name: this.peer_name,
+            from_peer_uuid: this.peer_uuid,
+        });
+        this.renderTorch(peer_id);
+    }
+
+    setPeerTorch(peer_id, type, status) {
+        const state = this.peerTorch.get(peer_id) || { supported: false, on: false, since: 0, pending: null };
+        this.peerTorch.set(peer_id, state);
+        if (type === 'torchSupported') {
+            state.supported = status;
+        } else {
+            if (status && !state.on) state.since = Date.now();
+            state.on = status;
+            if (state.pending) {
+                clearTimeout(state.pending);
+                state.pending = null;
+                this.userLog(status ? 'success' : 'info', status ? 'Senter dinyalakan' : 'Senter dimatikan', 'top-end', 3000);
+            }
+        }
+        this.renderTorch(peer_id);
+    }
+
+    handleTorchFailed(peer_id) {
+        const state = this.peerTorch.get(peer_id);
+        if (state && state.pending) {
+            clearTimeout(state.pending);
+            state.pending = null;
+        }
+        this.userLog('error', 'Gagal menyalakan senter', 'top-end', 4000);
+        this.renderTorch(peer_id);
+    }
+
+    renderTorch(peer_id) {
+        const wrap = this.getId(peer_id + '__torch');
+        const state = this.peerTorch.get(peer_id);
+        if (wrap && state) {
+            const pill = wrap.querySelector('.tob-torch-pill');
+            wrap.classList.toggle('is-on', state.supported && state.on);
+            wrap.classList.toggle('is-unavailable', !state.supported);
+            wrap.classList.toggle('is-pending', !!state.pending);
+            pill.disabled = !state.supported || !!state.pending;
+            pill.querySelector('.tob-torch-label').textContent = !state.supported
+                ? 'Tidak tersedia'
+                : state.on
+                  ? 'Senter menyala'
+                  : 'Senter';
+            pill.title = !state.supported
+                ? 'Senter tidak tersedia di kamera ini'
+                : state.on
+                  ? 'Matikan senter'
+                  : 'Nyalakan senter';
+        }
+        this.updateTorchTimes();
+    }
+
+    updateTorchTimes() {
+        let anyOn = false;
+        this.peerTorch.forEach((state, peer_id) => {
+            if (!state.on) return;
+            anyOn = true;
+            const wrap = this.getId(peer_id + '__torch');
+            const time = wrap && wrap.querySelector('.tob-torch-time');
+            if (time) time.textContent = tobMmss(Math.floor((Date.now() - state.since) / 1000));
+        });
+        if (anyOn && !this.peerTorchTimer) this.peerTorchTimer = setInterval(() => this.updateTorchTimes(), 1000);
+        if (!anyOn && this.peerTorchTimer) {
+            clearInterval(this.peerTorchTimer);
+            this.peerTorchTimer = null;
+        }
+    }
+
     handleNewProducers = async (data) => {
         if (data.length > 0) {
             console.log('SocketOn New producers', data);
@@ -1166,6 +1339,16 @@ class RoomClient {
             console.log('📸 Remote snapshot requested');
             this.captureLocalEvidence();
             return; // ⛔ prevent normal peerAction flow
+        }
+
+        // 🔦 REMOTE FLASHLIGHT
+        if (data.action === 'torch') {
+            this.handleTorchRequest(data);
+            return;
+        }
+        if (data.action === 'torchFailed') {
+            this.handleTorchFailed(data.from_peer_id);
+            return;
         }
 
         this.peerAction(data.from_peer_name, data.peer_id, data.action, false, data.broadcast, true, data.message);
@@ -1767,6 +1950,9 @@ class RoomClient {
                 case mediaType.video:
                     this.setIsVideo(true);
                     this.event(_EVENTS.startVideo);
+                    // A new camera track always starts with the torch off
+                    this.cameraTrack = track;
+                    this.reportTorch(this.isTorchSupported(track), false);
                     break;
                 case mediaType.screen:
                     this.setIsScreen(true);
@@ -2412,6 +2598,8 @@ class RoomClient {
             case mediaType.video:
                 this.setIsVideo(false);
                 this.event(_EVENTS.stopVideo);
+                this.cameraTrack = null;
+                this.reportTorch(false, false);
                 break;
             case mediaType.screen:
                 this.setIsScreen(false);
@@ -2707,9 +2895,12 @@ class RoomClient {
                 d.appendChild(i);
                 d.appendChild(p);
                 d.appendChild(pm);
+                const showTorch = !remoteIsScreen && isPresenter && BUTTONS.consumerVideo.torchButton;
+                if (showTorch) d.appendChild(this.createTorchControls(remotePeerId, peer_info));
                 //d.appendChild(vb);
                 document.body.appendChild(vb);
                 this.videoMediaContainer.appendChild(d);
+                if (showTorch) this.renderTorch(remotePeerId);
 
                 await this.attachMediaStream(elem, stream, type, 'Consumer');
 
@@ -8648,6 +8839,10 @@ class RoomClient {
                     } else {
                         if (peer_hand) peer_hand.style.display = 'none';
                     }
+                    break;
+                case 'torchSupported':
+                case 'torch':
+                    this.setPeerTorch(peer_id, type, status);
                     break;
                 default:
                     break;
