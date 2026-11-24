@@ -63,6 +63,7 @@ let BUTTONS = {
         videoMirrorButton: true,
         fullScreenButton: true,
         snapShotButton: true,
+        torchButton: true, // Presenter: remote flashlight on the customer's camera
         focusVideoButton: true,
         sendMessageButton: true,
         sendFileButton: true,
