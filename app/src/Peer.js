@@ -31,6 +31,10 @@ module.exports = class Peer {
         this.peer_recording = peer_recording;
         this.peer_hand = peer_hand;
 
+        // Remote flashlight, reported by the peer's own camera
+        this.peer_info.peer_torch_supported = false;
+        this.peer_info.peer_torch = false;
+
         this.transports = new Map();
         this.consumers = new Map();
         this.producers = new Map();
@@ -80,6 +84,12 @@ module.exports = class Peer {
             case 'peerAudio':
                 this.peer_info.peer_audio_volume = data.volume;
                 this.peer_audio_volume = data.volume;
+                break;
+            case 'torchSupported':
+                this.peer_info.peer_torch_supported = data.status;
+                break;
+            case 'torch':
+                this.peer_info.peer_torch = data.status;
                 break;
             default:
                 break;
