@@ -2081,6 +2081,7 @@ function startServer() {
                 'eject',
                 'ban',
                 'geoLocation',
+                'torch',
             ];
 
             if (presenterActions.some((v) => data.action === v)) {
