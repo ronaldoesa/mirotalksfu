@@ -2895,7 +2895,12 @@ class RoomClient {
                 d.appendChild(i);
                 d.appendChild(p);
                 d.appendChild(pm);
-                const showTorch = !remoteIsScreen && isPresenter && BUTTONS.consumerVideo.torchButton;
+                // Surveyors control the torch on customer tiles, whoever joined first
+                const showTorch =
+                    !remoteIsScreen &&
+                    isSurveyorName(this.peer_name) &&
+                    !isSurveyorName(peer_info.peer_name) &&
+                    BUTTONS.consumerVideo.torchButton;
                 if (showTorch) d.appendChild(this.createTorchControls(remotePeerId, peer_info));
                 //d.appendChild(vb);
                 document.body.appendChild(vb);

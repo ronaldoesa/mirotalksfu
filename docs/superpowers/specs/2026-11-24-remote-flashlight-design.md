@@ -10,7 +10,7 @@ During a live survey the surveyor can turn the customer's camera flashlight on a
 
 ## Decisions
 
-- **Only the surveyor (room presenter) can toggle.** Enforced on the server, not just hidden in the UI.
+- **Only a surveyor can toggle.** A surveyor is any participant whose name contains "Surveyor" (case-insensitive), whoever joined first. Enforced on the server, not just hidden in the UI.
 - **No approval step.** The light switches immediately; the customer is told by an on-screen chip.
 - **Unavailable = disabled with a reason.** If the customer's current camera has no torch, the surveyor's control is greyed out and says why. The customer's camera is never switched automatically.
 - **State lives in the customer's server-side peer info** (`peer_torch_supported`, `peer_torch`), the same way mic/camera/hand status is kept, so a surveyor who joins late or reconnects sees the correct state.
@@ -21,7 +21,7 @@ During a live survey the surveyor can turn the customer's camera flashlight on a
 - Works on Chrome for Android with the rear camera. Front cameras have no torch. iPhone Safari and desktop webcams generally report no `torch` capability, so they show as unavailable. Support is detected at runtime, never by user agent.
 - `applyConstraints` replaces all existing constraints, and omitted ones fall back to defaults. The call must merge the track's current constraints (`track.getConstraints()`) with the torch setting, otherwise the resolution can drop from 1080p.
 - Any new camera track (swap camera, change device, video off/on) starts with the torch off. State is re-reported on every new video producer.
-- Room presenter = first participant to join (`config.presenters.join_first`). If the customer joins the room first, they become presenter and the surveyor won't get the control. This is existing behaviour and out of scope here.
+- The torch does not use the room presenter (first joiner). It uses the name rule above, so it works when the customer joins first. Anyone who types "Surveyor" into their name gets the control; the join link is the only gate.
 
 ## Behaviour
 
@@ -52,8 +52,7 @@ During a live survey the surveyor can turn the customer's camera flashlight on a
   - New `updatePeerInfo` cases `torchSupported` → `peer_info.peer_torch_supported`, `torch` → `peer_info.peer_torch`.
   - Initialise both to `false`.
 - `app/src/Server.js`
-  - Add `'torch'` to `presenterActions` in the `peerAction` handler, so non-presenters can't toggle.
-  - For `torch`, the presenter check uses the sender's own stored `peer_name` / `peer_uuid`, not the payload's `from_peer_*`. `isPeerPresenter` falls back to a name match for reconnects, so payload names could be spoofed. The other presenter actions still have that weakness; that's pre-existing and out of scope.
+  - In the `peerAction` handler, drop `torch` unless the sender's own stored `peer_name` passes `isSurveyorName()`. The name in the payload (`from_peer_name`) is never trusted.
   - `torchFailed` is a plain relay back to the presenter.
 - `app/src/config.js` and `config.template.js`
   - `ui.buttons.consumerVideo.torchButton: true`. The client merges server buttons shallowly, so the flag must exist here too, or the server's `consumerVideo` drops it.

@@ -399,6 +399,11 @@ function tobMmss(secs) {
     return String(Math.floor(secs / 60)).padStart(2, '0') + ':' + String(secs % 60).padStart(2, '0');
 }
 
+// Surveyors are identified by name (the server applies the same rule to the torch)
+function isSurveyorName(name) {
+    return typeof name === 'string' && name.toLowerCase().includes('surveyor');
+}
+
 function tobRoomElapsed() {
     return tobMmss(tobRoomStart ? Math.floor((Date.now() - tobRoomStart) / 1000) : 0);
 }

@@ -2081,18 +2081,20 @@ function startServer() {
                 'eject',
                 'ban',
                 'geoLocation',
-                'torch',
             ];
 
+            // Torch: only a surveyor may toggle, judged by the sender's own stored name, not the payload
+            if (data.action === 'torch') {
+                const sender = getRoomAndPeer(socket).peer;
+                if (!sender || !isSurveyorName(sender.peer_name)) return;
+            }
+
             if (presenterActions.some((v) => data.action === v)) {
-                // Torch: check the sender's own name/uuid, not the ones in the payload
-                const sender = data.action === 'torch' ? getRoomAndPeer(socket).peer : null;
-                if (data.action === 'torch' && !sender) return;
                 const isPresenter = isPeerPresenter(
                     socket.room_id,
                     socket.id,
-                    sender ? sender.peer_name : data.from_peer_name,
-                    sender ? sender.peer_uuid : data.from_peer_uuid,
+                    data.from_peer_name,
+                    data.from_peer_uuid,
                 );
                 if (!isPresenter) return;
             }
@@ -3102,6 +3104,11 @@ function startServer() {
         if (Number.isNaN(value)) return NaN;
         if (typeof structuredClone === 'function') return structuredClone(value);
         return JSON.parse(JSON.stringify(value));
+    }
+
+    // Surveyors are identified by name, regardless of join order
+    function isSurveyorName(peer_name) {
+        return typeof peer_name === 'string' && peer_name.toLowerCase().includes('surveyor');
     }
 
     function isPeerPresenter(room_id, peer_id, peer_name, peer_uuid) {
